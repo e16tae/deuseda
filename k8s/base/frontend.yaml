@@ -27,6 +27,8 @@ spec:
       labels:
         app: deuseda-frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/e16tae/deuseda-frontend:latest
