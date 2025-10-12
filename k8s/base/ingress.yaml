@@ -26,17 +26,6 @@ spec:
                 name: deuseda-frontend
                 port:
                   number: 80
-    # Apex domain redirect to www
-    - host: deuseda.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: deuseda-frontend
-                port:
-                  number: 80
     # API subdomain - Backend
     - host: api.deuseda.com
       http:
@@ -50,7 +39,6 @@ spec:
                   number: 8080
   tls:
     - hosts:
-        - deuseda.com
         - www.deuseda.com
         - api.deuseda.com
       secretName: deuseda-tls-cert

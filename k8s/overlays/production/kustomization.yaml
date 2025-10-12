@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - ../../base
   - frontend-nginx-configmap.yaml
+  - apex-redirect-ingress.yaml
 
 namePrefix: prod-
 
