@@ -4,6 +4,7 @@ kind: Kustomization
 # Use 'resources' instead of deprecated 'bases'
 resources:
   - ../../base
+  - frontend-nginx-configmap.yaml
 
 namePrefix: prod-
 
@@ -32,3 +33,5 @@ images:
 patchesStrategicMerge:
   - resources-patch.yaml
   - ingress-patch.yaml
+  - configmap-patch.yaml
+  - secret-patch.yaml
