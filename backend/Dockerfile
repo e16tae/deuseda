@@ -4,7 +4,7 @@ FROM rust:1.83-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig libssh2-dev libssh2-static
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig libssh2-dev libssh2-static zlib-dev zlib-static
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
