@@ -1,0 +1,32 @@
+# Dev-specific ingress configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deuseda-ingress
+  annotations:
+    # Allow HTTP in dev
+    konghq.com/protocols: "http,https"
+    # Disable rate limiting in dev (optional)
+    konghq.com/plugins: ""
+spec:
+  rules:
+    - host: dev.console.deuseda.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deuseda-frontend
+                port:
+                  number: 80
+    - host: dev.api.deuseda.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deuseda-backend
+                port:
+                  number: 8080

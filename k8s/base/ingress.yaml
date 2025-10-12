@@ -1,32 +1,24 @@
+# Kong Ingress for Deuseda Console
+# Assumes Kong Gateway is already installed in the cluster
+
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: deuseda-ingress
-  namespace: default
   annotations:
+    kubernetes.io/ingress.class: kong
     konghq.com/strip-path: "false"
     konghq.com/protocols: "https"
     konghq.com/https-redirect-status-code: "301"
+    # Rate limiting plugin
+    konghq.com/plugins: rate-limiting-deuseda
 spec:
   ingressClassName: kong
   rules:
+    # Frontend domain
     - host: console.deuseda.com
       http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: deuseda-backend
-                port:
-                  number: 8080
-          - path: /ws
-            pathType: Prefix
-            backend:
-              service:
-                name: deuseda-backend
-                port:
-                  number: 8080
           - path: /
             pathType: Prefix
             backend:
@@ -34,7 +26,30 @@ spec:
                 name: deuseda-frontend
                 port:
                   number: 80
+    # API subdomain - Backend
+    - host: api.deuseda.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deuseda-backend
+                port:
+                  number: 8080
   tls:
     - hosts:
         - console.deuseda.com
+        - api.deuseda.com
       secretName: deuseda-tls-cert
+---
+# Kong Rate Limiting Plugin
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limiting-deuseda
+config:
+  minute: 200
+  hour: 10000
+  policy: local
+plugin: rate-limiting

@@ -102,17 +102,27 @@ kubectl logs -f deployment/deuseda-frontend -n default
 
 ## CI/CD Pipeline
 
-The GitHub Actions workflow (`.github/workflows/deploy.yml`) handles:
+The project uses multiple GitHub Actions workflows:
 
-1. **Build**: Builds Docker images for backend and frontend
-2. **Push**: Pushes images to GitHub Container Registry
-3. **Update**: Updates image tags in `k8s/overlays/production/kustomization.yaml`
-4. **Commit**: Commits changes back to the main branch
-5. **Sync**: ArgoCD automatically syncs changes to the cluster
+### Production Deployment (`.github/workflows/cd-production.yaml`)
+
+Triggered on push to `main` branch:
+
+1. **Build and Push**: Builds Docker images and pushes to GHCR
+2. **Security Scan**: Runs Trivy vulnerability scanning
+3. **Update Manifests**: Updates image tags in `k8s/overlays/production/kustomization.yaml`
+4. **Trigger ArgoCD Sync**: Syncs changes to the cluster via ArgoCD CLI
+5. **Verify Deployment**: Performs health checks on deployed services
+6. **Notify**: Sends deployment status notification
+
+### CI Workflows
+
+- **`.github/workflows/ci-develop.yaml`**: Runs tests and linting on `develop` branch
+- **`.github/workflows/ci-main.yaml`**: Runs tests and linting on `main` branch PRs
 
 ### Workflow Trigger
 
-Push to `main` branch triggers the deployment:
+Push to `main` branch triggers production deployment:
 
 ```bash
 git checkout develop
@@ -123,8 +133,15 @@ git push origin develop
 # Merge to main
 git checkout main
 git merge develop
-git push origin main  # This triggers GitHub Actions
+git push origin main  # This triggers production deployment
 ```
+
+Requires the following GitHub Secrets:
+- `GH_PAT`: GitHub Personal Access Token
+- `ARGOCD_SERVER`: ArgoCD server URL
+- `ARGOCD_TOKEN`: ArgoCD authentication token
+
+See [docs/ENVIRONMENT_VARIABLES.md](../docs/ENVIRONMENT_VARIABLES.md) for details.
 
 ## Environment Variables
 

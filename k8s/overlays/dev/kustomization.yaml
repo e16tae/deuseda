@@ -1,34 +1,28 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Use 'resources' instead of deprecated 'bases'
 resources:
   - ../../base
 
-namePrefix: prod-
+namePrefix: dev-
 
-# Use labels instead of commonLabels to avoid patch conflicts
 labels:
   - pairs:
-      environment: production
+      environment: dev
 
 replicas:
   - name: deuseda-backend
-    count: 3
+    count: 1
   - name: deuseda-frontend
-    count: 3
+    count: 1
 
-# Image overrides - these will be updated by GitHub Actions
 images:
   - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend
     newName: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend
-    newTag: latest
+    newTag: develop
   - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend
     newName: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend
-    newTag: latest
+    newTag: develop
 
-# patchesStrategicMerge is deprecated but still widely used and supported
-# It handles multi-document YAML files better than the new patches format
 patchesStrategicMerge:
-  - resources-patch.yaml
   - ingress-patch.yaml

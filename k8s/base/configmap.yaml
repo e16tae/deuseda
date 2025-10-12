@@ -1,17 +1,39 @@
+# Application Configuration
+# This ConfigMap contains non-sensitive application settings
+# that can be easily changed without rebuilding images
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: deuseda-config
-  namespace: default
+  name: app-config
 data:
+  # Application Identity
+  APP_NAME: "deuseda-console"
+  APP_ENV: "base"
+
+  # Domain Configuration (will be overridden by overlays)
+  FRONTEND_DOMAIN: "console.deuseda.com"
+  BACKEND_DOMAIN: "api.deuseda.com"
+  API_URL: "https://api.deuseda.com"
+
   # Backend Configuration
   SERVER_HOST: "0.0.0.0"
   SERVER_PORT: "8080"
   RUST_LOG: "info,deuseda_console=debug"
+
+  # SSH Target Configuration
   SSH_HOST: "deuseda.com"
   SSH_PORT: "22"
 
-  # Database Configuration (host and port)
-  POSTGRES_HOST: "postgres"
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: "deuseda_console"
+  # Database Configuration (non-sensitive)
+  DB_HOST: "deuseda-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "deuseda_console"
+  DB_USER: "deuseda"
+
+  # Session Configuration
+  SESSION_TIMEOUT: "3600"  # 1 hour in seconds
+  JWT_EXPIRATION: "86400"  # 24 hours in seconds
+
+  # Frontend Configuration
+  VITE_WS_URL: "wss://api.deuseda.com/ws"

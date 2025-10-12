@@ -32,42 +32,21 @@ spec:
           image: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend:latest
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: app-config
           env:
-            - name: SERVER_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: deuseda-config
-                  key: SERVER_HOST
-            - name: SERVER_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: deuseda-config
-                  key: SERVER_PORT
-            - name: RUST_LOG
-              valueFrom:
-                configMapKeyRef:
-                  name: deuseda-config
-                  key: RUST_LOG
-            - name: SSH_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: deuseda-config
-                  key: SSH_HOST
-            - name: SSH_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: deuseda-config
-                  key: SSH_PORT
+            # Secrets
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: deuseda-secret
-                  key: DATABASE_URL
+                  name: backend-secret
+                  key: database-url
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: deuseda-secret
-                  key: JWT_SECRET
+                  name: backend-secret
+                  key: jwt-secret
           livenessProbe:
             httpGet:
               path: /health
