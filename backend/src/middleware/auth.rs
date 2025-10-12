@@ -18,6 +18,7 @@ pub struct Claims {
 
 #[derive(Clone)]
 pub struct CurrentUser {
+    #[allow(dead_code)]
     pub id: Uuid,
 }
 

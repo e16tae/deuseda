@@ -65,12 +65,13 @@ async fn main() -> anyhow::Result<()> {
         .with_state(db_pool);
 
     // Get server address from environment
-    let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let _host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("SERVER_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080);
 
+    // Bind to all interfaces (0.0.0.0)
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Listening on {}", addr);
 

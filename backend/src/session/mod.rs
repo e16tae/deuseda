@@ -2,6 +2,7 @@ use crate::{db::DbPool, models::Session};
 use anyhow::Result;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub async fn create_session(
     pool: &DbPool,
     user_id: Uuid,
@@ -29,6 +30,7 @@ pub async fn create_session(
     Ok(session)
 }
 
+#[allow(dead_code)]
 pub async fn get_user_sessions(pool: &DbPool, user_id: Uuid) -> Result<Vec<Session>> {
     let sessions = sqlx::query_as::<_, Session>(
         "SELECT * FROM sessions WHERE user_id = $1 AND is_active = true ORDER BY last_accessed_at DESC"
@@ -40,6 +42,7 @@ pub async fn get_user_sessions(pool: &DbPool, user_id: Uuid) -> Result<Vec<Sessi
     Ok(sessions)
 }
 
+#[allow(dead_code)]
 pub async fn update_session_access(pool: &DbPool, session_id: Uuid) -> Result<()> {
     sqlx::query(
         "UPDATE sessions SET last_accessed_at = CURRENT_TIMESTAMP WHERE id = $1"
@@ -64,6 +67,7 @@ async fn create_tmux_session(session_name: &str) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn attach_to_tmux_session(session_name: &str) -> Result<String> {
     // Return the tmux command to attach
     Ok(format!("tmux attach-session -t {}", session_name))

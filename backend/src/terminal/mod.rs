@@ -1,17 +1,20 @@
 use anyhow::Result;
 use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 
+#[allow(dead_code)]
 pub struct Terminal {
     _pty_system: NativePtySystem,
 }
 
 impl Terminal {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             _pty_system: NativePtySystem::default(),
         }
     }
 
+    #[allow(dead_code)]
     pub async fn spawn_shell(&self) -> Result<()> {
         let pty_system = NativePtySystem::default();
         let pair = pty_system.openpty(PtySize {
