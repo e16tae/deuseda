@@ -27,7 +27,7 @@ spec:
       volumes:
         - name: nginx-config
           configMap:
-            name: frontend-nginx-config
+            name: prod-frontend-nginx-config
       containers:
         - name: frontend
           volumeMounts:
