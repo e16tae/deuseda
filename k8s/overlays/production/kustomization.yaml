@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+namespace: default
+
+# Image overrides - these will be updated by GitHub Actions
+images:
+  - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend
+    newTag: latest
+  - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend
+    newTag: latest
