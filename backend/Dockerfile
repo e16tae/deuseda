@@ -4,7 +4,7 @@ FROM rust:1.83-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache musl-dev openssl-dev pkgconfig
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig libssh2-dev libssh2-static
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
@@ -22,7 +22,7 @@ FROM alpine:3.19
 WORKDIR /app
 
 # Install runtime dependencies
-RUN apk add --no-cache libgcc openssl ca-certificates
+RUN apk add --no-cache libgcc openssl libssh2 ca-certificates
 
 # Copy the binary from builder
 COPY --from=builder /app/target/release/deuseda-console /app/deuseda-console
