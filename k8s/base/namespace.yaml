@@ -4,4 +4,4 @@ metadata:
   name: deuseda
   labels:
     name: deuseda
-    app: deuseda-console
+    app: deuseda

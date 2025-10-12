@@ -8,18 +8,18 @@ metadata:
   name: app-config
 data:
   # Application Identity
-  APP_NAME: "deuseda-console"
+  APP_NAME: "deuseda"
   APP_ENV: "base"
 
   # Domain Configuration (will be overridden by overlays)
-  FRONTEND_DOMAIN: "console.deuseda.com"
+  FRONTEND_DOMAIN: "www.deuseda.com"
   BACKEND_DOMAIN: "api.deuseda.com"
   API_URL: "https://api.deuseda.com"
 
   # Backend Configuration
   SERVER_HOST: "0.0.0.0"
   SERVER_PORT: "8080"
-  RUST_LOG: "info,deuseda_console=debug"
+  RUST_LOG: "info,deuseda=debug"
 
   # SSH Target Configuration
   SSH_HOST: "deuseda.com"

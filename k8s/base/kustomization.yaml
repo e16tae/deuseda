@@ -13,5 +13,5 @@ resources:
   - ingress.yaml
 
 commonLabels:
-  app.kubernetes.io/name: deuseda-console
+  app.kubernetes.io/name: deuseda
   app.kubernetes.io/managed-by: kustomize

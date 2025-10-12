@@ -1,6 +1,6 @@
-# deuseda-console
+# deuseda
 
-Web-based remote console service providing secure SSH terminal access through your browser at `console.deuseda.com`.
+Web-based remote console service providing secure SSH terminal access through your browser at `www.deuseda.com`.
 
 ## Features
 

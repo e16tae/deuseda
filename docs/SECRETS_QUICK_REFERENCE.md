@@ -72,14 +72,14 @@ RUST_LOG: "info,deuseda_console=debug"
 - HTTP 허용
 - Rate limiting 비활성화
 - 이미지 태그: `develop`
-- 도메인: `dev.console.deuseda.com`, `dev.api.deuseda.com`
+- 도메인: `dev.www.deuseda.com`, `dev.api.deuseda.com`
 
 ### Production (`k8s/overlays/production`)
 - Replicas: 3
 - HTTPS 강제
 - Rate limiting 활성화 (200/분, 10000/시간)
 - 이미지 태그: `main-<sha>`
-- 도메인: `console.deuseda.com`, `api.deuseda.com`
+- 도메인: `www.deuseda.com`, `api.deuseda.com`
 - Resource limits 높음
 
 ---

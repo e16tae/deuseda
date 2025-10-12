@@ -25,7 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache libgcc openssl libssh2 ca-certificates
 
 # Copy the binary from builder
-COPY --from=builder /app/target/release/deuseda-console /app/deuseda-console
+COPY --from=builder /app/target/release/deuseda /app/deuseda
 
 # Copy migrations
 COPY --from=builder /app/migrations /app/migrations
@@ -34,4 +34,4 @@ COPY --from=builder /app/migrations /app/migrations
 EXPOSE 8080
 
 # Run the binary
-CMD ["./deuseda-console"]
+CMD ["./deuseda"]

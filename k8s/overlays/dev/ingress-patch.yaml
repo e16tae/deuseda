@@ -10,7 +10,7 @@ metadata:
     konghq.com/plugins: ""
 spec:
   rules:
-    - host: dev.console.deuseda.com
+    - host: dev.www.deuseda.com
       http:
         paths:
           - path: /

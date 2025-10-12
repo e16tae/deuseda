@@ -27,12 +27,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "deuseda_console=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "deuseda=debug,tower_http=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Starting deuseda-console server");
+    tracing::info!("Starting deuseda server");
 
     // Initialize database connection pool
     let db_pool = db::init_pool().await?;

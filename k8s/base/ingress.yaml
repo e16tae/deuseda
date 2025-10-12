@@ -1,4 +1,4 @@
-# Kong Ingress for Deuseda Console
+# Kong Ingress for Deuseda
 # Assumes Kong Gateway is already installed in the cluster
 
 apiVersion: networking.k8s.io/v1
@@ -15,8 +15,19 @@ metadata:
 spec:
   ingressClassName: kong
   rules:
-    # Frontend domain
-    - host: console.deuseda.com
+    # Frontend domain (www)
+    - host: www.deuseda.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deuseda-frontend
+                port:
+                  number: 80
+    # Apex domain redirect to www
+    - host: deuseda.com
       http:
         paths:
           - path: /
@@ -39,7 +50,8 @@ spec:
                   number: 8080
   tls:
     - hosts:
-        - console.deuseda.com
+        - deuseda.com
+        - www.deuseda.com
         - api.deuseda.com
       secretName: deuseda-tls-cert
 ---

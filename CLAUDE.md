@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**deuseda-console** is a web-based remote console service accessible at console.deuseda.com. It provides secure SSH-based terminal access through a browser with multi-session management and persistent sessions.
+**deuseda** is a web-based remote console service accessible at www.deuseda.com. It provides secure SSH-based terminal access through a browser with multi-session management and persistent sessions.
 
 ### Key Features
 - SSH account authentication with Google Authenticator (2FA)

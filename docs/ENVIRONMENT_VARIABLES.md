@@ -20,13 +20,13 @@ Non-sensitive application configuration that can be modified without rebuilding 
 ### Application Identity
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APP_NAME` | `deuseda-console` | Application identifier |
+| `APP_NAME` | `deuseda` | Application identifier |
 | `APP_ENV` | `base` | Environment (overridden by overlays: `dev`, `production`) |
 
 ### Domain Configuration
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `FRONTEND_DOMAIN` | `console.deuseda.com` | Frontend domain name |
+| `FRONTEND_DOMAIN` | `www.deuseda.com` | Frontend domain name |
 | `BACKEND_DOMAIN` | `api.deuseda.com` | Backend API domain name |
 | `API_URL` | `https://api.deuseda.com` | Full API URL |
 | `VITE_WS_URL` | `wss://api.deuseda.com/ws` | WebSocket URL for frontend |

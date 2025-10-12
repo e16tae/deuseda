@@ -17,7 +17,7 @@ env:
 
   # Application Configuration
   BACKEND_DOMAIN: api.deuseda.com
-  FRONTEND_DOMAIN: console.deuseda.com
+  FRONTEND_DOMAIN: www.deuseda.com
 
 jobs:
   build-and-push:
@@ -26,7 +26,7 @@ jobs:
     # Production environment protection (configure in GitHub repo settings)
     environment:
       name: production
-      url: https://console.deuseda.com
+      url: https://www.deuseda.com
     permissions:
       contents: read
       packages: write

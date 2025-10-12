@@ -20,7 +20,7 @@ k8s/
 │   ├── postgres.yaml              # PostgreSQL StatefulSet
 │   ├── backend.yaml               # Backend Deployment & Service
 │   ├── frontend.yaml              # Frontend Deployment & Service
-│   ├── ingress.yaml               # Kong Ingress for console.deuseda.com
+│   ├── ingress.yaml               # Kong Ingress for www.deuseda.com
 │   └── kustomization.yaml         # Kustomize base config
 ├── overlays/
 │   └── production/
@@ -75,10 +75,10 @@ kubectl create secret tls deuseda-tls-cert \
 kubectl apply -f k8s/argocd-application.yaml
 
 # Check sync status
-argocd app get deuseda-console
+argocd app get deuseda
 
 # Sync manually if needed
-argocd app sync deuseda-console
+argocd app sync deuseda
 ```
 
 ### 4. Verify Deployment
@@ -203,21 +203,21 @@ kubectl describe ingress deuseda-ingress -n default
 
 ```bash
 # Check application status
-argocd app get deuseda-console
+argocd app get deuseda
 
 # View sync logs
-argocd app logs deuseda-console
+argocd app logs deuseda
 
 # Force refresh
-argocd app sync deuseda-console --force
+argocd app sync deuseda --force
 ```
 
 ## Monitoring
 
 ### Health Checks
 
-- Backend health endpoint: `https://console.deuseda.com/health`
-- Frontend: `https://console.deuseda.com/`
+- Backend health endpoint: `https://www.deuseda.com/health`
+- Frontend: `https://www.deuseda.com/`
 
 ### Logs
 
@@ -263,7 +263,7 @@ Migrations run automatically on backend startup via SQLx. To run manually:
 kubectl get pods -n default | grep backend
 
 # Run migrations
-kubectl exec -it <backend-pod-name> -n default -- ./deuseda-console migrate
+kubectl exec -it <backend-pod-name> -n default -- ./deuseda migrate
 ```
 
 ## Backup and Restore
