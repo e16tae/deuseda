@@ -104,13 +104,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     permissions:
+      contents: read
+      packages: read
       security-events: write
     # Continue even if scan fails, report to Security tab
     continue-on-error: true
 
     steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run Trivy scanner - Backend
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/deuseda-backend:main-${{ needs.build-and-push.outputs.backend_tag }}
           format: 'sarif'
@@ -126,6 +138,9 @@ jobs:
 
       - name: Run Trivy scanner - Frontend
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/deuseda-frontend:main-${{ needs.build-and-push.outputs.frontend_tag }}
           format: 'sarif'
