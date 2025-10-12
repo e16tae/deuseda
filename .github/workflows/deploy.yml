@@ -72,14 +72,39 @@ jobs:
         id: vars
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Run Trivy vulnerability scanner on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/deuseda-backend:main-${{ steps.vars.outputs.SHORT_SHA }}
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+
+      - name: Run Trivy vulnerability scanner on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/deuseda-frontend:main-${{ steps.vars.outputs.SHORT_SHA }}
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: '.'
+
       - name: Update Kubernetes manifests
         run: |
           cd k8s/overlays/production
 
-          # Update image tags in kustomization.yaml
+          # Update image repository if needed (only on first run)
           sed -i "s|ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend|${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/deuseda-backend|g" kustomization.yaml
           sed -i "s|ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend|${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/deuseda-frontend|g" kustomization.yaml
+
+          # Update image tags with SHA
           sed -i "s|newTag: .*|newTag: main-${{ steps.vars.outputs.SHORT_SHA }}|g" kustomization.yaml
+
+          # Show what changed
+          git diff kustomization.yaml
 
       - name: Commit and push updated manifests
         run: |
