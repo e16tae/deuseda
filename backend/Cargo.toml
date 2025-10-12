@@ -21,7 +21,8 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid"
 # Authentication & Security
 uuid = { version = "1.6", features = ["v4", "serde"] }
 jsonwebtoken = "9"
-argon2 = "0.5"
+argon2 = "0.4"
+base64ct = "=1.6.0"  # Pin to version that doesn't require edition2024
 
 # SSH & PTY
 ssh2 = "0.9"
