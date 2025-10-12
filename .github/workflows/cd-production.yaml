@@ -205,6 +205,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: update-manifests
 
+    outputs:
+      argocd_deployed: ${{ steps.check-argocd.outputs.deployed }}
+
     steps:
       - name: Install ArgoCD CLI
         run: |
@@ -212,12 +215,14 @@ jobs:
           chmod +x argocd
           sudo mv argocd /usr/local/bin/
 
-      - name: Trigger ArgoCD Application Sync
+      - name: Check ArgoCD configuration
+        id: check-argocd
         env:
           ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
           if [ -z "$ARGOCD_SERVER" ] || [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+            echo "deployed=false" >> $GITHUB_OUTPUT
             echo "⚠️  ArgoCD credentials not configured. Skipping automatic sync."
             echo "📝 Please configure ARGOCD_SERVER and ARGOCD_TOKEN secrets."
             echo "📋 Image tags updated to: main-${{ needs.build-and-push.outputs.backend_tag }}"
@@ -227,6 +232,14 @@ jobs:
             echo "  or visit ArgoCD UI"
             exit 0
           fi
+          echo "deployed=true" >> $GITHUB_OUTPUT
+
+      - name: Trigger ArgoCD Application Sync
+        if: steps.check-argocd.outputs.deployed == 'true'
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+        run: |
 
           echo "🚀 Triggering ArgoCD sync for deuseda-production..."
           argocd app sync deuseda-production \
@@ -241,13 +254,11 @@ jobs:
           echo "✅ ArgoCD sync initiated successfully"
 
       - name: Wait for ArgoCD Sync Completion
+        if: steps.check-argocd.outputs.deployed == 'true'
         env:
           ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
-          if [ -z "$ARGOCD_SERVER" ] || [ -z "$ARGOCD_AUTH_TOKEN" ]; then
-            exit 0
-          fi
 
           echo "⏳ Waiting for ArgoCD sync to complete and application to be healthy..."
           argocd app wait deuseda-production \
@@ -265,6 +276,7 @@ jobs:
     name: Verify Deployment Health
     runs-on: ubuntu-latest
     needs: trigger-argocd-sync
+    if: needs.trigger-argocd-sync.outputs.argocd_deployed == 'true'
 
     steps:
       - name: Wait for deployment to stabilize
@@ -309,10 +321,20 @@ jobs:
       - name: Determine deployment status
         id: status
         run: |
+          # verify-deployment may be skipped if ArgoCD is not configured
+          VERIFY_RESULT="${{ needs.verify-deployment.result }}"
+          if [ "$VERIFY_RESULT" == "skipped" ]; then
+            VERIFY_OK="true"
+          elif [ "$VERIFY_RESULT" == "success" ]; then
+            VERIFY_OK="true"
+          else
+            VERIFY_OK="false"
+          fi
+
           if [ "${{ needs.build-and-push.result }}" == "success" ] && \
              [ "${{ needs.update-manifests.result }}" == "success" ] && \
              [ "${{ needs.trigger-argocd-sync.result }}" == "success" ] && \
-             [ "${{ needs.verify-deployment.result }}" == "success" ]; then
+             [ "$VERIFY_OK" == "true" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
             echo "icon=✅" >> $GITHUB_OUTPUT
           else
