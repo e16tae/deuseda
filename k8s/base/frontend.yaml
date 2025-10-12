@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend:latest
+          image: ghcr.io/e16tae/deuseda-frontend:latest
           ports:
             - containerPort: 80
           livenessProbe:

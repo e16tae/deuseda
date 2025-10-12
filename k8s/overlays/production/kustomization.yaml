@@ -21,10 +21,10 @@ replicas:
 # Image overrides - these will be updated by GitHub Actions
 images:
   - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend
-    newName: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-backend
+    newName: ghcr.io/e16tae/deuseda-backend
     newTag: latest
   - name: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend
-    newName: ghcr.io/YOUR_GITHUB_USERNAME/deuseda-frontend
+    newName: ghcr.io/e16tae/deuseda-frontend
     newTag: latest
 
 # patchesStrategicMerge is deprecated but still widely used and supported
