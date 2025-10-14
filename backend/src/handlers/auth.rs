@@ -1,5 +1,5 @@
-use axum::{extract::State, http::StatusCode, Json};
 use crate::{auth as auth_service, db::DbPool, models::*};
+use axum::{extract::State, http::StatusCode, Json};
 
 pub async fn login(
     State(pool): State<DbPool>,

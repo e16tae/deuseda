@@ -1,3 +1,4 @@
+use crate::{db::DbPool, middleware::auth::Claims, models::User};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -14,7 +15,6 @@ use ssh2::Session;
 use std::net::TcpStream;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use crate::{db::DbPool, middleware::auth::Claims, models::User};
 
 #[derive(Deserialize)]
 pub struct WsQuery {
@@ -47,8 +47,7 @@ pub async fn websocket_handler(
     )
     .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let user_id = Uuid::parse_str(&token_data.claims.sub)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let user_id = Uuid::parse_str(&token_data.claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     // Get username from database
     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
@@ -57,7 +56,10 @@ pub async fn websocket_handler(
         .await
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    tracing::info!("WebSocket connection authorized for user: {}", user.username);
+    tracing::info!(
+        "WebSocket connection authorized for user: {}",
+        user.username
+    );
 
     let session_id = params.session_id.unwrap_or_else(|| "default".to_string());
 
@@ -65,7 +67,11 @@ pub async fn websocket_handler(
 }
 
 async fn handle_socket(socket: WebSocket, username: String, session_id: String) {
-    tracing::info!("WebSocket connection established for user: {} (session: {})", username, session_id);
+    tracing::info!(
+        "WebSocket connection established for user: {} (session: {})",
+        username,
+        session_id
+    );
 
     let (mut sender, mut receiver) = socket.split();
 
@@ -74,13 +80,17 @@ async fn handle_socket(socket: WebSocket, username: String, session_id: String) 
         Some(Ok(Message::Text(pwd))) => pwd.trim().to_string(),
         Some(Ok(Message::Binary(data))) => String::from_utf8_lossy(&data).trim().to_string(),
         _ => {
-            let _ = sender.send(Message::Text("Error: No password received\r\n".to_string())).await;
+            let _ = sender
+                .send(Message::Text("Error: No password received\r\n".to_string()))
+                .await;
             return;
         }
     };
 
     // Send connecting message
-    let _ = sender.send(Message::Text("Connecting to SSH server...\r\n".to_string())).await;
+    let _ = sender
+        .send(Message::Text("Connecting to SSH server...\r\n".to_string()))
+        .await;
 
     // Get SSH configuration
     let ssh_host = std::env::var("SSH_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -151,7 +161,7 @@ async fn handle_socket(socket: WebSocket, username: String, session_id: String) 
         if let Err(e) = channel.request_pty(
             "xterm-256color",
             Some(pty_modes),
-            Some((initial_width, initial_height, 0, 0))
+            Some((initial_width, initial_height, 0, 0)),
         ) {
             tracing::error!("Failed to request PTY: {}", e);
             return Err(format!("Failed to request PTY: {}", e));
@@ -202,7 +212,10 @@ async fn handle_socket(socket: WebSocket, username: String, session_id: String) 
             match channel.stderr().read(&mut stderr_buffer) {
                 Ok(n) if n > 0 => {
                     tracing::debug!("SSH stderr read {} bytes", n);
-                    if tx_from_ssh.blocking_send(stderr_buffer[..n].to_vec()).is_err() {
+                    if tx_from_ssh
+                        .blocking_send(stderr_buffer[..n].to_vec())
+                        .is_err()
+                    {
                         tracing::error!("Failed to send stderr to WebSocket");
                         break;
                     }

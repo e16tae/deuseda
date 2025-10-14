@@ -26,6 +26,7 @@ pub struct Session {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[allow(dead_code)]
 pub struct AuditLog {
     pub id: Uuid,
     pub user_id: Option<Uuid>,
