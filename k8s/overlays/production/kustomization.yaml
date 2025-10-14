@@ -35,3 +35,17 @@ patchesStrategicMerge:
   - imagepullsecrets-patch.yaml
   - apex-redirect-patch.yaml
   - redirect-service-patch.yaml
+
+patchesJson6902:
+  - target:
+      group: bitnami.com
+      version: v1alpha1
+      kind: SealedSecret
+      name: prod-backend-secret
+    path: sealedsecret-backend-name-patch.yaml
+  - target:
+      group: bitnami.com
+      version: v1alpha1
+      kind: SealedSecret
+      name: prod-postgres-secret
+    path: sealedsecret-postgres-name-patch.yaml
