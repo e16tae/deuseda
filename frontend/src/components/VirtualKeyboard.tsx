@@ -146,27 +146,6 @@ const EXTRA_KEY_ROWS: ExtraKey[][] = [
     { label: '↑', value: '\x1b[A' },
     { label: '↓', value: '\x1b[B' },
     { label: '→', value: '\x1b[C' },
-    { label: '`', value: '`' },
-    { label: '1', value: '1' },
-    { label: '2', value: '2' },
-    { label: '3', value: '3' },
-    { label: '4', value: '4' },
-    { label: '5', value: '5' },
-    { label: '6', value: '6' },
-    { label: '7', value: '7' },
-    { label: '8', value: '8' },
-    { label: '9', value: '9' },
-    { label: '0', value: '0' },
-    { label: '-', value: '-' },
-    { label: '=', value: '=' },
-    { label: '[', value: '[' },
-    { label: ']', value: ']' },
-    { label: '\\', value: '\\' },
-    { label: ';', value: ';' },
-    { label: "'", value: "'" },
-    { label: ',', value: ',' },
-    { label: '.', value: '.' },
-    { label: '/', value: '/' },
   ],
 ];
 
@@ -446,8 +425,13 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
 
     // Start new syllable
     if (!state.initial) {
-      state.initial = char;
-      state.medial = null;
+      if (charIsVowel) {
+        state.initial = 'ㅇ';
+        state.medial = char;
+      } else {
+        state.initial = char;
+        state.medial = null;
+      }
       state.final = null;
       emitHangulState();
       return;
@@ -478,10 +462,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
         }
 
         flushHangulState();
-        state.initial = char;
-        state.medial = null;
-        state.final = null;
-        emitHangulState();
+        handleHangulInput(char);
         return;
       }
 
@@ -503,7 +484,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
         const { remain, carry } = decomposeFinal(state.final);
         state.final = remain;
         emitHangulState();
-        const carryInitial = carry;
+        const carryInitial = carry || 'ㅇ';
         const cachedChar = char;
         flushHangulState();
         state.initial = carryInitial;
