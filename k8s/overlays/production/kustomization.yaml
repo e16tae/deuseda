@@ -22,10 +22,10 @@ replicas:
 images:
   - name: ghcr.io/e16tae/deuseda-backend
     newName: ghcr.io/e16tae/deuseda-backend
-    newTag: main-4799ec8
+    newTag: main-f85fa4f
   - name: ghcr.io/e16tae/deuseda-frontend
     newName: ghcr.io/e16tae/deuseda-frontend
-    newTag: main-4799ec8
+    newTag: main-f85fa4f
 
 # patchesStrategicMerge is deprecated but still widely used and supported
 # It handles multi-document YAML files better than the new patches format
