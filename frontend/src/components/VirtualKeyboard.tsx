@@ -27,6 +27,109 @@ interface ExtraKey {
   width?: number;
 }
 
+interface HangulState {
+  initial: string | null;
+  medial: string | null;
+  final: string | null;
+  lastOutput: string;
+}
+
+const CHOSEONG_LIST: string[] = [
+  'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ',
+  'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+];
+
+const JUNGSUNG_LIST: string[] = [
+  'ㅏ', 'ㅐ', 'ㅑ', 'ㅒ', 'ㅓ', 'ㅔ', 'ㅕ', 'ㅖ', 'ㅗ',
+  'ㅘ', 'ㅙ', 'ㅚ', 'ㅛ', 'ㅜ', 'ㅝ', 'ㅞ', 'ㅟ', 'ㅠ', 'ㅡ', 'ㅢ', 'ㅣ',
+];
+
+const JONGSUNG_LIST: string[] = [
+  '', 'ㄱ', 'ㄲ', 'ㄳ', 'ㄴ', 'ㄵ', 'ㄶ', 'ㄷ', 'ㄹ', 'ㄺ', 'ㄻ', 'ㄼ',
+  'ㄽ', 'ㄾ', 'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ',
+  'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
+];
+
+const CHOSEONG_SET = new Set<string>(CHOSEONG_LIST);
+const JUNGSUNG_SET = new Set<string>(JUNGSUNG_LIST);
+const JONGSUNG_SET = new Set<string>(JONGSUNG_LIST.filter(Boolean));
+
+const VOWEL_COMBINE: Record<string, Record<string, string>> = {
+  'ㅗ': { 'ㅏ': 'ㅘ', 'ㅐ': 'ㅙ', 'ㅣ': 'ㅚ' },
+  'ㅜ': { 'ㅓ': 'ㅝ', 'ㅔ': 'ㅞ', 'ㅣ': 'ㅟ' },
+  'ㅡ': { 'ㅣ': 'ㅢ' },
+};
+
+const VOWEL_DECOMPOSE: Record<string, [string, string]> = {
+  'ㅘ': ['ㅗ', 'ㅏ'],
+  'ㅙ': ['ㅗ', 'ㅐ'],
+  'ㅚ': ['ㅗ', 'ㅣ'],
+  'ㅝ': ['ㅜ', 'ㅓ'],
+  'ㅞ': ['ㅜ', 'ㅔ'],
+  'ㅟ': ['ㅜ', 'ㅣ'],
+  'ㅢ': ['ㅡ', 'ㅣ'],
+};
+
+const FINAL_COMBINE: Record<string, Record<string, string>> = {
+  'ㄱ': { 'ㅅ': 'ㄳ' },
+  'ㄴ': { 'ㅈ': 'ㄵ', 'ㅎ': 'ㄶ' },
+  'ㄹ': { 'ㄱ': 'ㄺ', 'ㅁ': 'ㄻ', 'ㅂ': 'ㄼ', 'ㅅ': 'ㄽ', 'ㅌ': 'ㄾ', 'ㅍ': 'ㄿ', 'ㅎ': 'ㅀ' },
+  'ㅂ': { 'ㅅ': 'ㅄ' },
+};
+
+const FINAL_DECOMPOSE: Record<string, [string, string]> = {
+  'ㄳ': ['ㄱ', 'ㅅ'],
+  'ㄵ': ['ㄴ', 'ㅈ'],
+  'ㄶ': ['ㄴ', 'ㅎ'],
+  'ㄺ': ['ㄹ', 'ㄱ'],
+  'ㄻ': ['ㄹ', 'ㅁ'],
+  'ㄼ': ['ㄹ', 'ㅂ'],
+  'ㄽ': ['ㄹ', 'ㅅ'],
+  'ㄾ': ['ㄹ', 'ㅌ'],
+  'ㄿ': ['ㄹ', 'ㅍ'],
+  'ㅀ': ['ㄹ', 'ㅎ'],
+  'ㅄ': ['ㅂ', 'ㅅ'],
+};
+
+const isHangulJamo = (char: string) =>
+  CHOSEONG_SET.has(char) || JUNGSUNG_SET.has(char) || JONGSUNG_SET.has(char);
+
+const isVowel = (char: string) => JUNGSUNG_SET.has(char);
+
+const composeMedial = (current: string, next: string) => VOWEL_COMBINE[current]?.[next] ?? null;
+const decomposeMedial = (char: string) => VOWEL_DECOMPOSE[char] ?? null;
+
+const combineFinal = (current: string, next: string) => FINAL_COMBINE[current]?.[next] ?? null;
+const decomposeFinal = (char: string): { remain: string | null; carry: string } => {
+  const pair = FINAL_DECOMPOSE[char];
+  if (pair) {
+    return { remain: pair[0], carry: pair[1] };
+  }
+  return { remain: null, carry: char };
+};
+
+const getHangulSyllable = (state: HangulState): string => {
+  if (!state.initial) {
+    return '';
+  }
+
+  if (!state.medial) {
+    return state.initial;
+  }
+
+  const initialIndex = CHOSEONG_LIST.indexOf(state.initial);
+  const medialIndex = JUNGSUNG_LIST.indexOf(state.medial);
+
+  if (initialIndex === -1 || medialIndex === -1) {
+    return state.initial + (state.medial ?? '') + (state.final ?? '');
+  }
+
+  const finalIndex = state.final ? JONGSUNG_LIST.indexOf(state.final) : 0;
+  const resolvedFinalIndex = finalIndex >= 0 ? finalIndex : 0;
+  const syllableCode = 0xac00 + initialIndex * 21 * 28 + medialIndex * 28 + resolvedFinalIndex;
+  return String.fromCharCode(syllableCode);
+};
+
 const EXTRA_KEY_ROWS: ExtraKey[][] = [
   [
     { label: 'ESC', value: '\x1b', color: 'bg-red-600 hover:bg-red-500' },
@@ -182,6 +285,12 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [altPressed, setAltPressed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hangulStateRef = useRef<HangulState>({
+    initial: null,
+    medial: null,
+    final: null,
+    lastOutput: '',
+  });
 
   useEffect(() => {
     if (!containerRef.current || !onHeightChange) {
@@ -216,6 +325,206 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     };
   }, []);
 
+  const sendKeyValue = (
+    rawValue: string | undefined,
+    options?: { preserveModifiers?: boolean }
+  ) => {
+    if (!rawValue) {
+      return;
+    }
+
+    let valueToSend = rawValue;
+
+    if (!options?.preserveModifiers) {
+      if (ctrlPressed && rawValue.length === 1) {
+        const char = rawValue.toLowerCase();
+        if (char >= 'a' && char <= 'z') {
+          valueToSend = String.fromCharCode(char.charCodeAt(0) - 96);
+        }
+      }
+
+      if (altPressed && !rawValue.startsWith('\x1b')) {
+        valueToSend = '\x1b' + valueToSend;
+      }
+    }
+
+    onKeyPress(valueToSend);
+
+    if (!options?.preserveModifiers) {
+      if (ctrlPressed) {
+        setCtrlPressed(false);
+      }
+      if (altPressed) {
+        setAltPressed(false);
+      }
+    }
+  };
+
+  const sendBackspaces = (count: number) => {
+    for (let i = 0; i < count; i += 1) {
+      sendKeyValue('\x7f', { preserveModifiers: true });
+    }
+  };
+
+  const emitHangulState = () => {
+    const state = hangulStateRef.current;
+    const output = getHangulSyllable(state);
+    if (output === state.lastOutput) {
+      return;
+    }
+
+    if (state.lastOutput) {
+      const backspaceCount = Array.from(state.lastOutput).length;
+      sendBackspaces(backspaceCount);
+    }
+
+    if (output) {
+      sendKeyValue(output, { preserveModifiers: true });
+    }
+
+    state.lastOutput = output;
+  };
+
+  const resetHangulState = () => {
+    const state = hangulStateRef.current;
+    state.initial = null;
+    state.medial = null;
+    state.final = null;
+    state.lastOutput = '';
+  };
+
+  const flushHangulState = () => {
+    const state = hangulStateRef.current;
+    if (!state.initial && !state.medial && !state.final) {
+      return;
+    }
+    resetHangulState();
+  };
+
+  const handleHangulBackspace = () => {
+    const state = hangulStateRef.current;
+    if (!state.initial) {
+      return false;
+    }
+
+    if (state.final) {
+      const { remain } = decomposeFinal(state.final);
+      state.final = remain ?? null;
+      emitHangulState();
+      if (!state.initial && !state.medial && !state.final) {
+        resetHangulState();
+      }
+      return true;
+    }
+
+    if (state.medial) {
+      const decomposed = decomposeMedial(state.medial);
+      if (decomposed) {
+        state.medial = decomposed[0];
+        emitHangulState();
+        return true;
+      }
+
+      state.medial = null;
+      emitHangulState();
+      return true;
+    }
+
+    if (state.initial) {
+      state.initial = null;
+      emitHangulState();
+      resetHangulState();
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleHangulInput = (char: string) => {
+    const state = hangulStateRef.current;
+    const charIsVowel = isVowel(char);
+
+    // Start new syllable
+    if (!state.initial) {
+      state.initial = char;
+      state.medial = null;
+      state.final = null;
+      emitHangulState();
+      return;
+    }
+
+    // No medial yet
+    if (state.initial && !state.medial) {
+      if (charIsVowel) {
+        state.medial = char;
+        emitHangulState();
+        return;
+      }
+
+      flushHangulState();
+      state.initial = char;
+      emitHangulState();
+      return;
+    }
+
+    // Have initial and medial, but no final
+    if (state.initial && state.medial && !state.final) {
+      if (charIsVowel) {
+        const combined = composeMedial(state.medial, char);
+        if (combined) {
+          state.medial = combined;
+          emitHangulState();
+          return;
+        }
+
+        flushHangulState();
+        state.initial = char;
+        state.medial = null;
+        state.final = null;
+        emitHangulState();
+        return;
+      }
+
+      if (JONGSUNG_SET.has(char)) {
+        state.final = char;
+        emitHangulState();
+        return;
+      }
+
+      flushHangulState();
+      state.initial = char;
+      emitHangulState();
+      return;
+    }
+
+    // Have initial, medial, and final
+    if (state.initial && state.medial && state.final) {
+      if (charIsVowel) {
+        const { remain, carry } = decomposeFinal(state.final);
+        state.final = remain;
+        emitHangulState();
+        const carryInitial = carry;
+        const cachedChar = char;
+        flushHangulState();
+        state.initial = carryInitial;
+        handleHangulInput(cachedChar);
+        return;
+      }
+
+      const combinedFinal = combineFinal(state.final, char);
+      if (combinedFinal) {
+        state.final = combinedFinal;
+        emitHangulState();
+        return;
+      }
+
+      flushHangulState();
+      state.initial = char;
+      emitHangulState();
+      return;
+    }
+  };
+
   const currentLayout = (() => {
     switch (layout) {
       case 'korean':
@@ -229,34 +538,6 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     }
   })();
 
-  const sendKeyValue = (rawValue: string | undefined) => {
-    if (!rawValue) {
-      return;
-    }
-
-    let valueToSend = rawValue;
-
-    if (ctrlPressed && rawValue.length === 1) {
-      const char = rawValue.toLowerCase();
-      if (char >= 'a' && char <= 'z') {
-        valueToSend = String.fromCharCode(char.charCodeAt(0) - 96);
-      }
-    }
-
-    if (altPressed && !rawValue.startsWith('\x1b')) {
-      valueToSend = '\x1b' + valueToSend;
-    }
-
-    onKeyPress(valueToSend);
-
-    if (ctrlPressed) {
-      setCtrlPressed(false);
-    }
-    if (altPressed) {
-      setAltPressed(false);
-    }
-  };
-
   const handleMainKey = (key: KeyboardKey) => {
     switch (key.type) {
       case 'shift':
@@ -264,19 +545,27 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
         return;
       case 'layout':
         if (key.targetLayout) {
+          flushHangulState();
           setShiftPressed(false);
           setLayout(key.targetLayout);
         }
         return;
       case 'backspace':
+        if (layout === 'korean' && handleHangulBackspace()) {
+          setShiftPressed(false);
+          return;
+        }
+        flushHangulState();
         sendKeyValue(key.value ?? '\x7f');
         setShiftPressed(false);
         return;
       case 'space':
+        flushHangulState();
         sendKeyValue(key.value ?? ' ');
         setShiftPressed(false);
         return;
       case 'enter':
+        flushHangulState();
         sendKeyValue(key.value ?? '\r');
         setShiftPressed(false);
         return;
@@ -295,7 +584,13 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
           }
         }
 
-        sendKeyValue(valueToSend);
+        if (layout === 'korean' && isHangulJamo(valueToSend)) {
+          handleHangulInput(valueToSend);
+        } else {
+          flushHangulState();
+          sendKeyValue(valueToSend);
+        }
+
         if (shiftPressed) {
           setShiftPressed(false);
         }
@@ -321,6 +616,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     }
     event.currentTarget.blur();
 
+    flushHangulState();
     setShiftPressed(false);
 
     if (key.modifier === 'ctrl') {
