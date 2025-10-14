@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -17,6 +17,30 @@ export function Terminal({ sessionId }: TerminalProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const isMobile = useIsMobile();
   const [keypadHeight, setKeypadHeight] = useState(0);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const touchStateRef = useRef<{ lastY: number; accumulated: number } | null>(null);
+  const lineHeightRef = useRef<number>(18);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setAvailableHeight(null);
+      return;
+    }
+
+    const updateHeight = () => {
+      setAvailableHeight(window.visualViewport?.height ?? window.innerHeight);
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', updateHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      viewport?.removeEventListener('resize', updateHeight);
+    };
+  }, [isMobile]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -54,6 +78,17 @@ export function Terminal({ sessionId }: TerminalProps) {
 
     // Disable native keyboard on mobile by preventing focus on xterm's textarea
     let observer: MutationObserver | null = null;
+    const measureLineHeight = () => {
+      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
+      if (rowElement) {
+        const height = rowElement.getBoundingClientRect().height;
+        if (height > 0) {
+          lineHeightRef.current = height;
+        }
+      }
+    };
+
+    measureLineHeight();
     if (isMobile) {
       // Continuously prevent textarea focus
       const preventTextareaFocus = () => {
@@ -98,10 +133,13 @@ export function Terminal({ sessionId }: TerminalProps) {
     setTimeout(() => {
       try {
         fitAddon.fit();
+        measureLineHeight();
       } catch (e) {
         console.error('Failed to fit terminal:', e);
       }
     }, 0);
+    setTimeout(measureLineHeight, 100);
+    setTimeout(measureLineHeight, 500);
 
     // Connect to WebSocket
     const token = localStorage.getItem('token');
@@ -162,17 +200,23 @@ export function Terminal({ sessionId }: TerminalProps) {
     });
 
     // Send terminal resize to backend
-    xterm.onResize(({ cols, rows }) => {
+    const resizeDisposable = xterm.onResize(({ cols, rows }) => {
       const resizeMessage = JSON.stringify({ type: 'resize', cols, rows });
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(resizeMessage);
         console.log(`Terminal resized: ${cols}x${rows}`);
       }
+      measureLineHeight();
+    });
+
+    const renderDisposable = xterm.onRender(() => {
+      measureLineHeight();
     });
 
     // Handle window resize
     const handleResize = () => {
       fitAddon.fit();
+      measureLineHeight();
     };
     window.addEventListener('resize', handleResize);
 
@@ -188,6 +232,8 @@ export function Terminal({ sessionId }: TerminalProps) {
       if (observer) {
         observer.disconnect();
       }
+      resizeDisposable.dispose();
+      renderDisposable.dispose();
       window.removeEventListener('resize', handleResize);
       ws.close();
       xterm.dispose();
@@ -200,22 +246,89 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
+  const terminalHeight = isMobile && availableHeight
+    ? Math.max(availableHeight - keypadHeight, 200)
+    : undefined;
+
+  const handleTerminalTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (!isMobile) {
+      return;
+    }
+
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'TEXTAREA' || target.querySelector('textarea')) {
+      e.preventDefault();
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      touchStateRef.current = { lastY: touch.clientY, accumulated: 0 };
+
+      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
+      if (rowElement) {
+        const height = rowElement.getBoundingClientRect().height;
+        if (height > 0) {
+          lineHeightRef.current = height;
+        }
+      }
+    }
+  };
+
+  const handleTerminalTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (!isMobile) {
+      return;
+    }
+    if (e.touches.length !== 1) {
+      return;
+    }
+
+    const state = touchStateRef.current;
+    const terminal = xtermRef.current;
+    if (!state || !terminal) {
+      return;
+    }
+
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - state.lastY;
+    state.lastY = currentY;
+    state.accumulated += deltaY;
+
+    const lineHeight = lineHeightRef.current || 18;
+    if (lineHeight === 0) {
+      return;
+    }
+
+    const linesToScroll = -Math.trunc(state.accumulated / lineHeight);
+    if (linesToScroll !== 0) {
+      terminal.scrollLines(linesToScroll);
+      state.accumulated += linesToScroll * lineHeight;
+    }
+
+    e.preventDefault();
+  };
+
+  const handleTerminalTouchEnd = () => {
+    if (!isMobile) {
+      return;
+    }
+    touchStateRef.current = null;
+  };
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       {/* Terminal - takes full height with bottom padding for keypad */}
       <div
         ref={terminalRef}
         className="h-full w-full overflow-hidden"
-        style={isMobile ? { paddingBottom: `${keypadHeight}px` } : undefined}
-        onTouchStart={(e) => {
-          if (isMobile) {
-            // Prevent default to avoid triggering textarea focus
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'TEXTAREA' || target.querySelector('textarea')) {
-              e.preventDefault();
-            }
-          }
-        }}
+        style={isMobile ? {
+          paddingBottom: `${keypadHeight}px`,
+          height: terminalHeight ? `${terminalHeight}px` : '100%',
+          touchAction: 'none'
+        } : undefined}
+        onTouchStart={handleTerminalTouchStart}
+        onTouchMove={handleTerminalTouchMove}
+        onTouchEnd={handleTerminalTouchEnd}
+        onTouchCancel={handleTerminalTouchEnd}
       />
 
       {/* Virtual Keyboard - full QWERTY layout on mobile */}
