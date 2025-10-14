@@ -4,6 +4,7 @@ kind: Kustomization
 # Use 'resources' instead of deprecated 'bases'
 resources:
   - ../../base
+  - ../../sealed-secrets
 
 namePrefix: prod-
 

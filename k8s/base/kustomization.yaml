@@ -6,7 +6,6 @@ namespace: deuseda
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
   - certificate.yaml
   - postgres-statefulset.yaml
   - backend-deployment.yaml
