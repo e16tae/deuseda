@@ -1,5 +1,5 @@
-use axum::{extract::State, http::StatusCode, Json};
 use crate::{db::DbPool, models::Session};
+use axum::{extract::State, http::StatusCode, Json};
 
 pub async fn list_sessions(
     State(_pool): State<DbPool>,

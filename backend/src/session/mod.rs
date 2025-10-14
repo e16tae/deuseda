@@ -44,12 +44,10 @@ pub async fn get_user_sessions(pool: &DbPool, user_id: Uuid) -> Result<Vec<Sessi
 
 #[allow(dead_code)]
 pub async fn update_session_access(pool: &DbPool, session_id: Uuid) -> Result<()> {
-    sqlx::query(
-        "UPDATE sessions SET last_accessed_at = CURRENT_TIMESTAMP WHERE id = $1"
-    )
-    .bind(session_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE sessions SET last_accessed_at = CURRENT_TIMESTAMP WHERE id = $1")
+        .bind(session_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -61,7 +59,10 @@ async fn create_tmux_session(session_name: &str) -> Result<()> {
         .await?;
 
     if !output.status.success() {
-        anyhow::bail!("Failed to create tmux session: {}", String::from_utf8_lossy(&output.stderr));
+        anyhow::bail!(
+            "Failed to create tmux session: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     Ok(())
