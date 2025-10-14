@@ -33,11 +33,7 @@ pub async fn auth_middleware(
         .and_then(|header| header.to_str().ok())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let token = if auth_header.starts_with("Bearer ") {
-        &auth_header[7..]
-    } else {
-        auth_header
-    };
+    let token = auth_header.strip_prefix("Bearer ").unwrap_or(auth_header);
 
     let secret = std::env::var("JWT_SECRET")
         .expect("JWT_SECRET environment variable must be set for production use");

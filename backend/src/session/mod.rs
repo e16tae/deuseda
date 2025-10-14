@@ -54,7 +54,7 @@ pub async fn update_session_access(pool: &DbPool, session_id: Uuid) -> Result<()
 
 async fn create_tmux_session(session_name: &str) -> Result<()> {
     let output = tokio::process::Command::new("tmux")
-        .args(&["new-session", "-d", "-s", session_name])
+        .args(["new-session", "-d", "-s", session_name])
         .output()
         .await?;
 
