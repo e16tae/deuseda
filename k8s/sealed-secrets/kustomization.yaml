@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 실제 배포에 사용할 SealedSecret 파일을 아래 resources 배열에 추가하세요.
+# 예시:
+# resources:
+#   - postgres-secret.sealedsecret.yaml
+#   - backend-secret.sealedsecret.yaml
+
+resources: []

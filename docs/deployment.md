@@ -27,7 +27,7 @@ Kong Gateway → https://www.example.com (Web UI) / wss://api.example.com/ws (te
 2. **Kubernetes**: 1.25+, Kong Ingress Controller, cert-manager(선택), StorageClass
 3. **ArgoCD**: 프로젝트 생성 및 `argocd` CLI 접속 권한
 4. **도메인**: `www`, `api`, `*.example.com` 을 Ingress Controller로 포인팅
-5. **Secrets**: [환경 구성 문서](./environment.md)를 따라 `.env`, Kubernetes Secret을 준비
+5. **Secrets**: [환경 구성 문서](./environment.md)를 따라 `.env` 작성 후 `./scripts/seal-secrets.sh`로 SealedSecret을 생성·커밋하고, GHCR Pull Secret/TLS도 준비
 
 ## 로컬 개발 (Docker Compose)
 
@@ -90,9 +90,10 @@ argocd app sync deuseda-production
 
 ## Kubernetes 배포
 
-1. Secrets 적용  
+1. Sealed Secrets 적용  
    ```bash
-   kubectl apply -f k8s/base/secrets.yaml
+   # 스크립트로 생성한 SealedSecret을 커밋한 뒤
+   kubectl apply -k k8s/sealed-secrets
    kubectl create secret docker-registry ghcr-secret ...  # GHCR 인증
    ```
 2. TLS 인증서 (택1)
@@ -157,4 +158,3 @@ kubectl delete application deuseda-production -n argocd
 kubectl delete namespace deuseda
 docker-compose down -v  # 로컬 환경 정리
 ```
-

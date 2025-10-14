@@ -79,3 +79,4 @@ npm run dev
 - PostgreSQL 백업은 월 1회 이상 복원 테스트를 수행합니다.
 - 저장소를 새롭게 공개할 때는 `reset-git-history.sh` 스크립트로 깔끔한 초기 커밋을 준비하세요.
 - 자동화 에이전트가 수행한 작업은 `agent/<issue-id>-slug` 브랜치에서 검토 후 develop/main에 병합합니다.
+- 환경 변수는 `./scripts/seal-secrets.sh`로 암호화한 뒤 `k8s/sealed-secrets/`에 커밋해 GitOps 파이프라인에서 관리합니다.
