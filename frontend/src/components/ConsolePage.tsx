@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Terminal } from './Terminal';
-import { PlusCircle, LogOut } from 'lucide-react';
+import { PlusCircle, LogOut, Eye, Trash2 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import type { TerminalSession } from '@/api/client';
 
@@ -11,9 +11,17 @@ interface ConsolePageProps {
   onLogout: () => void;
 }
 
+const generateSessionId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+};
+
 export function ConsolePage({ username, onLogout }: ConsolePageProps) {
   const [sessions, setSessions] = useState<TerminalSession[]>([]);
-  const [activeSession, setActiveSession] = useState<string>('1');
+  const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>([]);
+  const [activeSession, setActiveSession] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   // Load sessions from server on mount
@@ -24,20 +32,24 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
         if (serverSessions.length === 0) {
           // Create default session if none exist
           const defaultSession = await apiClient.createTerminalSession({
-            session_id: '1',
+            session_id: generateSessionId(),
             title: 'Terminal 1',
           });
           setSessions([defaultSession]);
-          setActiveSession('1');
+          setVisibleSessionIds([defaultSession.id]);
+          setActiveSession(defaultSession.id);
         } else {
           setSessions(serverSessions);
+          setVisibleSessionIds(serverSessions.map((session) => session.id));
           setActiveSession(serverSessions[0].id);
         }
       } catch (error) {
         console.error('Failed to load sessions:', error);
         // Fallback to creating a default session
-        setSessions([{ id: '1', title: 'Terminal 1' }]);
-        setActiveSession('1');
+        const fallbackId = generateSessionId();
+        setSessions([{ id: fallbackId, title: 'Terminal 1' }]);
+        setVisibleSessionIds([fallbackId]);
+        setActiveSession(fallbackId);
       } finally {
         setLoading(false);
       }
@@ -46,37 +58,87 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
     loadSessions();
   }, []);
 
+  useEffect(() => {
+    setVisibleSessionIds((prev) => {
+      const validIds = prev.filter((id) => sessions.some((session) => session.id === id));
+      if (validIds.length === prev.length) {
+        return prev;
+      }
+      return validIds;
+    });
+  }, [sessions]);
+
+  useEffect(() => {
+    if (visibleSessionIds.length === 0) {
+      if (activeSession !== '') {
+        setActiveSession('');
+      }
+      return;
+    }
+    if (!visibleSessionIds.includes(activeSession)) {
+      setActiveSession(visibleSessionIds[0]);
+    }
+  }, [visibleSessionIds, activeSession]);
+
   const addNewSession = async () => {
-    const newId = String(sessions.length + 1);
-    const newTitle = `Terminal ${newId}`;
+    const newId = generateSessionId();
+    const newTitle = `Terminal ${sessions.length + 1}`;
 
     try {
       const newSession = await apiClient.createTerminalSession({
         session_id: newId,
         title: newTitle,
       });
-      setSessions([...sessions, newSession]);
+      setSessions((prev) => [...prev, newSession]);
+      setVisibleSessionIds((prev) => [...prev.filter((id) => id !== newSession.id), newSession.id]);
       setActiveSession(newSession.id);
     } catch (error) {
       console.error('Failed to create session:', error);
     }
   };
 
-  const closeSession = async (id: string) => {
-    if (sessions.length === 1) return; // Keep at least one session
+  const hideSession = (id: string) => {
+    setVisibleSessionIds((prev) => {
+      if (!prev.includes(id)) {
+        return prev;
+      }
+      const nextVisible = prev.filter((sessionId) => sessionId !== id);
+      if (activeSession === id) {
+        setActiveSession(nextVisible[0] ?? '');
+      }
+      return nextVisible;
+    });
+  };
 
+  const resumeSession = (id: string) => {
+    setVisibleSessionIds((prev) => {
+      if (prev.includes(id)) {
+        return prev;
+      }
+      return [...prev, id];
+    });
+    setActiveSession(id);
+  };
+
+  const terminateSession = async (id: string) => {
     try {
       await apiClient.deleteTerminalSession(id);
-      const newSessions = sessions.filter(s => s.id !== id);
-      setSessions(newSessions);
-
-      if (activeSession === id && newSessions.length > 0) {
-        setActiveSession(newSessions[0].id);
-      }
     } catch (error) {
       console.error('Failed to delete session:', error);
     }
+
+    const nextSessions = sessions.filter((session) => session.id !== id);
+    const nextVisible = visibleSessionIds.filter((sessionId) => sessionId !== id);
+    setSessions(nextSessions);
+    setVisibleSessionIds(nextVisible);
+
+    if (activeSession === id) {
+      setActiveSession(nextVisible[0] ?? '');
+    }
   };
+
+  const visibleSessions = sessions.filter((session) => visibleSessionIds.includes(session.id));
+  const hiddenSessions = sessions.filter((session) => !visibleSessionIds.includes(session.id));
 
   if (loading) {
     return (
@@ -102,40 +164,107 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
 
       {/* Terminal Tabs */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeSession} onValueChange={setActiveSession} className="flex flex-col h-full">
-          <div className="flex items-center gap-2 px-4 py-2 border-b">
-            <TabsList>
-              {sessions.map((session) => (
-                <TabsTrigger key={session.id} value={session.id} className="relative group">
-                  {session.title}
-                  {sessions.length > 1 && (
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeSession(session.id);
-                      }}
-                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                    >
-                      ×
-                    </span>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <Button size="sm" variant="outline" onClick={addNewSession}>
-              <PlusCircle className="w-4 h-4 mr-1" />
-              New Tab
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {sessions.map((session) => (
-              <TabsContent key={session.id} value={session.id} className="h-full m-0 p-4">
-                <Terminal sessionId={session.id} />
-              </TabsContent>
+        {hiddenSessions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/30">
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+              Hidden sessions
+            </span>
+            {hiddenSessions.map((session) => (
+              <div key={session.id} className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1">
+                <span className="text-sm font-medium">{session.title}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => resumeSession(session.id)}
+                  className="px-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Resume
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => terminateSession(session.id)}
+                  className="px-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Terminate
+                </Button>
+              </div>
             ))}
           </div>
-        </Tabs>
+        )}
+
+        {visibleSessions.length > 0 ? (
+          <Tabs value={activeSession} onValueChange={setActiveSession} className="flex flex-col h-full">
+            <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b">
+              <TabsList>
+                {visibleSessions.map((session) => (
+                  <TabsTrigger key={session.id} value={session.id} className="flex items-center gap-2">
+                    <span>{session.title}</span>
+                    {visibleSessions.length > 1 && (
+                      <button
+                        type="button"
+                        className="ml-1 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          hideSession(session.id);
+                        }}
+                        aria-label={`Hide ${session.title}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button size="sm" variant="outline" onClick={addNewSession}>
+                  <PlusCircle className="w-4 h-4 mr-1" />
+                  New Session
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={!activeSession}
+                  onClick={() => activeSession && terminateSession(activeSession)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Terminate Current
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              {visibleSessions.map((session) => (
+                <TabsContent key={session.id} value={session.id} className="h-full m-0 p-4">
+                  <Terminal sessionId={session.id} />
+                </TabsContent>
+              ))}
+            </div>
+          </Tabs>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
+            <p>No active terminals. Resume an existing session or create a new one.</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {hiddenSessions.map((session) => (
+                <Button
+                  key={session.id}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => resumeSession(session.id)}
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  {session.title}
+                </Button>
+              ))}
+              <Button size="sm" variant="outline" onClick={addNewSession}>
+                <PlusCircle className="w-4 h-4 mr-1" />
+                Start New Session
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
