@@ -1,0 +1,28 @@
+# Naked (Apex) Certificate for deuseda.com
+# Uses HTTP-01 challenge
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: deuseda-naked-tls
+spec:
+  secretName: deuseda-naked-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "deuseda.com"
+---
+# Wildcard Certificate for *.deuseda.com and deuseda.com
+# Uses DNS-01 challenge via Cloudflare
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: deuseda-wildcard-tls
+spec:
+  secretName: deuseda-wildcard-tls
+  issuerRef:
+    name: letsencrypt-dns01
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.deuseda.com"
+    - "deuseda.com"

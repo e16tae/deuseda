@@ -1,0 +1,50 @@
+# Kong Plugin for Apex Domain Redirect
+# Redirects deuseda.com to www.deuseda.com
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: deuseda-redirect-plugin
+config:
+  location: https://www.deuseda.com
+  status_code: 301
+plugin: redirect
+---
+# Dummy Service for Redirect
+# Kong requires a backend service even though it will redirect
+# IMPORTANT: No selector = no endpoints (Kong redirect plugin handles the request)
+apiVersion: v1
+kind: Service
+metadata:
+  name: deuseda-redirect-dummy
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+---
+# Ingress for Apex Domain
+# Handles deuseda.com and redirects to www.deuseda.com
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deuseda-apex-redirect
+  annotations:
+    konghq.com/plugins: deuseda-redirect-plugin
+spec:
+  ingressClassName: kong
+  rules:
+    - host: deuseda.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: deuseda-redirect-dummy
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - deuseda.com
+      secretName: deuseda-naked-tls

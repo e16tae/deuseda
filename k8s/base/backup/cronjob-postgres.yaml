@@ -1,0 +1,139 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: backup-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: postgres-backup
+            image: postgres:16-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              # Configuration
+              NAMESPACE="deuseda"
+              POSTGRES_POD="prod-postgres-0"
+              POSTGRES_USER="deuseda"
+              POSTGRES_DB="deuseda_console"
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_NAME="deuseda-postgres-${TIMESTAMP}.sql.gz"
+              R2_BUCKET="k8s-backup"
+              R2_ENDPOINT="https://46f33a23a4e51568b4309d666d1d1669.r2.cloudflarestorage.com"
+
+              # Log function
+              log() {
+                  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+              }
+
+              # Fetch PostgreSQL credentials
+              log "Fetching PostgreSQL credentials..."
+              POSTGRES_PASSWORD=$(cat /run/secrets/postgres/postgres-password)
+
+              # Configure AWS credentials for R2
+              export AWS_ACCESS_KEY_ID=$(cat /run/secrets/aws/aws-access-key)
+              export AWS_SECRET_ACCESS_KEY=$(cat /run/secrets/aws/aws-secret-key)
+
+              # Install kubectl
+              log "Installing kubectl..."
+              apk add --no-cache curl
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+
+              # Install AWS CLI
+              log "Installing AWS CLI..."
+              apk add --no-cache python3 py3-pip
+              pip3 install awscli --break-system-packages
+
+              # Perform PostgreSQL backup
+              log "Starting PostgreSQL backup for database: ${POSTGRES_DB}..."
+              kubectl exec -n ${NAMESPACE} ${POSTGRES_POD} -- sh -c \
+                "PGPASSWORD='${POSTGRES_PASSWORD}' pg_dump -U ${POSTGRES_USER} -d ${POSTGRES_DB} --clean --if-exists" | \
+                gzip > /tmp/${BACKUP_NAME}
+
+              # Check backup file size
+              BACKUP_SIZE=$(du -h /tmp/${BACKUP_NAME} | cut -f1)
+              log "Backup completed: /tmp/${BACKUP_NAME} (${BACKUP_SIZE})"
+
+              # Verify backup integrity
+              log "Verifying backup integrity..."
+              if gunzip -t /tmp/${BACKUP_NAME} 2>/dev/null; then
+                  log "SUCCESS: Backup integrity verified"
+              else
+                  log "ERROR: Backup integrity check failed!"
+                  exit 1
+              fi
+
+              # Upload to Cloudflare R2
+              log "Uploading to Cloudflare R2..."
+              aws s3 cp /tmp/${BACKUP_NAME} s3://${R2_BUCKET}/deuseda/postgres/${BACKUP_NAME} \
+                  --endpoint-url=${R2_ENDPOINT}
+
+              if [ $? -eq 0 ]; then
+                  log "SUCCESS: Uploaded to R2: s3://${R2_BUCKET}/deuseda/postgres/${BACKUP_NAME}"
+              else
+                  log "ERROR: Failed to upload to R2"
+                  exit 1
+              fi
+
+              # Verify R2 backup
+              log "Verifying R2 backup..."
+              aws s3 ls s3://${R2_BUCKET}/deuseda/postgres/${BACKUP_NAME} --endpoint-url=${R2_ENDPOINT}
+
+              # Clean up old R2 backups (older than 30 days)
+              log "Cleaning up old R2 backups (older than 30 days)..."
+              CUTOFF_DATE=$(date -d '30 days ago' +%Y%m%d)
+              aws s3 ls s3://${R2_BUCKET}/deuseda/postgres/ --endpoint-url=${R2_ENDPOINT} | \
+                awk '{print $4}' | \
+                grep "deuseda-postgres-" | \
+                while read file; do
+                  FILE_DATE=$(echo $file | sed 's/deuseda-postgres-\([0-9]\{8\}\).*/\1/')
+                  if [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]; then
+                    log "Deleting old R2 backup: $file"
+                    aws s3 rm s3://${R2_BUCKET}/deuseda/postgres/$file --endpoint-url=${R2_ENDPOINT}
+                  fi
+                done
+
+              log "SUCCESS: PostgreSQL backup completed successfully!"
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            volumeMounts:
+            - name: postgres-password
+              mountPath: /run/secrets/postgres
+              readOnly: true
+            - name: aws-credentials
+              mountPath: /run/secrets/aws
+              readOnly: true
+          volumes:
+          - name: postgres-password
+            secret:
+              secretName: postgres-secret
+              items:
+              - key: password
+                path: postgres-password
+          - name: aws-credentials
+            secret:
+              secretName: r2-credentials
+              items:
+              - key: access-key
+                path: aws-access-key
+              - key: secret-key
+                path: aws-secret-key

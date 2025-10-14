@@ -1,0 +1,16 @@
+# Production-specific ingress configuration
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: deuseda-ingress
+  annotations:
+    # Force HTTPS in production
+    konghq.com/protocols: "https"
+    # Enable rate limiting
+    konghq.com/plugins: prod-rate-limiting-deuseda
+spec:
+  tls:
+    - hosts:
+        - www.deuseda.com
+        - api.deuseda.com
+      secretName: deuseda-wildcard-tls

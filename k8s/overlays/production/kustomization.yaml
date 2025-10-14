@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Use 'resources' instead of deprecated 'bases'
+resources:
+  - ../../base
+
+namePrefix: prod-
+
+# Use labels instead of commonLabels to avoid patch conflicts
+labels:
+  - pairs:
+      environment: production
+
+replicas:
+  - name: backend
+    count: 3
+  - name: frontend
+    count: 3
+
+images:
+  - name: ghcr.io/e16tae/deuseda-backend
+    newName: ghcr.io/e16tae/deuseda-backend
+    newTag: main-553021d
+  - name: ghcr.io/e16tae/deuseda-frontend
+    newName: ghcr.io/e16tae/deuseda-frontend
+    newTag: main-553021d
+
+# patchesStrategicMerge is deprecated but still widely used and supported
+# It handles multi-document YAML files better than the new patches format
+patchesStrategicMerge:
+  - resources-patch.yaml
+  - ingress-patch.yaml
+  - imagepullsecrets-patch.yaml
+  - apex-redirect-patch.yaml
+  - redirect-service-patch.yaml
