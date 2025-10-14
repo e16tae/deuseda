@@ -130,23 +130,19 @@ const getHangulSyllable = (state: HangulState): string => {
   return String.fromCharCode(syllableCode);
 };
 
-const EXTRA_KEY_ROWS: ExtraKey[][] = [
-  [
-    { label: 'ESC', value: '\x1b', color: 'bg-red-600 hover:bg-red-500' },
-    { label: 'Tab', value: '\t', color: 'bg-gray-600 hover:bg-gray-500' },
-    { label: 'Ctrl', modifier: 'ctrl', color: 'bg-purple-600 hover:bg-purple-500' },
-    { label: 'Alt', modifier: 'alt', color: 'bg-purple-600 hover:bg-purple-500' },
-    { label: '^C', value: '\x03', color: 'bg-yellow-600 hover:bg-yellow-500' },
-    { label: '^D', value: '\x04', color: 'bg-orange-600 hover:bg-orange-500' },
-    { label: '^Z', value: '\x1a', color: 'bg-purple-600 hover:bg-purple-500' },
-    { label: '^L', value: '\x0c', color: 'bg-blue-600 hover:bg-blue-500' },
-  ],
-  [
-    { label: '←', value: '\x1b[D' },
-    { label: '↑', value: '\x1b[A' },
-    { label: '↓', value: '\x1b[B' },
-    { label: '→', value: '\x1b[C' },
-  ],
+const EXTRA_KEYS: ExtraKey[] = [
+  { label: 'ESC', value: '\x1b', color: 'bg-red-600 hover:bg-red-500' },
+  { label: 'Tab', value: '\t', color: 'bg-gray-600 hover:bg-gray-500' },
+  { label: 'Ctrl', modifier: 'ctrl', color: 'bg-purple-600 hover:bg-purple-500' },
+  { label: 'Alt', modifier: 'alt', color: 'bg-purple-600 hover:bg-purple-500' },
+  { label: '^C', value: '\x03', color: 'bg-yellow-600 hover:bg-yellow-500' },
+  { label: '^D', value: '\x04', color: 'bg-orange-600 hover:bg-orange-500' },
+  { label: '^Z', value: '\x1a', color: 'bg-purple-600 hover:bg-purple-500' },
+  { label: '^L', value: '\x0c', color: 'bg-blue-600 hover:bg-blue-500' },
+  { label: '←', value: '\x1b[D' },
+  { label: '↑', value: '\x1b[A' },
+  { label: '↓', value: '\x1b[B' },
+  { label: '→', value: '\x1b[C' },
 ];
 
 const createCharRow = (chars: string): KeyboardKey[] =>
@@ -270,6 +266,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     final: null,
     lastOutput: '',
   });
+  const activePointerIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (!containerRef.current || !onHeightChange) {
@@ -579,7 +576,20 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     }
   };
 
+  const releasePointerId = (pointerId: number | undefined) => {
+    if (pointerId === undefined || Number.isNaN(pointerId)) {
+      return;
+    }
+    activePointerIdsRef.current.delete(pointerId);
+  };
+
   const handleMainKeyPointerDown = (key: KeyboardKey, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (activePointerIdsRef.current.has(event.pointerId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    activePointerIdsRef.current.add(event.pointerId);
     event.preventDefault();
     event.stopPropagation();
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -590,6 +600,12 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
   };
 
   const handleExtraKeyPointerDown = (key: ExtraKey, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (activePointerIdsRef.current.has(event.pointerId)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    activePointerIdsRef.current.add(event.pointerId);
     event.preventDefault();
     event.stopPropagation();
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
@@ -618,38 +634,39 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       ref={containerRef}
       className="fixed bottom-0 left-0 right-0 bg-gray-950 border-t border-gray-700 z-50 pb-safe shadow-2xl"
     >
-      <div className="px-2 pt-2 pb-1 space-y-1 border-b border-gray-800">
-        {EXTRA_KEY_ROWS.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex flex-wrap justify-center gap-1">
-            {row.map((key) => {
-              const isActive =
-                (key.modifier === 'ctrl' && ctrlPressed) ||
-                (key.modifier === 'alt' && altPressed);
+      <div className="px-2 pt-2 pb-1 border-b border-gray-800">
+        <div className="flex flex-wrap justify-center gap-1">
+          {EXTRA_KEYS.map((key) => {
+            const isActive =
+              (key.modifier === 'ctrl' && ctrlPressed) ||
+              (key.modifier === 'alt' && altPressed);
 
-              const baseColor = key.color ?? 'bg-gray-700 hover:bg-gray-600';
-              const activeColor = isActive
-                ? 'bg-blue-500 hover:bg-blue-500 ring-2 ring-blue-400'
-                : baseColor;
+            const baseColor = key.color ?? 'bg-gray-700 hover:bg-gray-600';
+            const activeColor = isActive
+              ? 'bg-blue-500 hover:bg-blue-500 ring-2 ring-blue-400'
+              : baseColor;
 
-              return (
-                <button
-                  key={key.label}
-                  onPointerDown={(event) => handleExtraKeyPointerDown(key, event)}
-                  className={`
-                    h-10 px-3 rounded text-white font-mono text-xs font-semibold
-                    ${activeColor}
-                    active:scale-95 transition-all select-none
-                    flex items-center justify-center
-                    touch-manipulation
-                  `}
-                  style={{ touchAction: 'manipulation' }}
-                >
-                  {key.label}
-                </button>
-              );
-            })}
-          </div>
-        ))}
+            return (
+              <button
+                key={key.label}
+                onPointerDown={(event) => handleExtraKeyPointerDown(key, event)}
+                onPointerUp={(event) => releasePointerId(event.pointerId)}
+                onPointerCancel={(event) => releasePointerId(event.pointerId)}
+                onPointerLeave={(event) => releasePointerId(event.pointerId)}
+                className={`
+                  h-10 px-3 rounded text-white font-mono text-xs font-semibold
+                  ${activeColor}
+                  active:scale-95 transition-all select-none
+                  flex items-center justify-center
+                  touch-manipulation
+                `}
+                style={{ touchAction: 'manipulation' }}
+              >
+                {key.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="px-2 pb-2 space-y-1">
@@ -670,14 +687,17 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
                 : baseColor;
 
               return (
-                <button
-                  key={`${key.label}-${keyIndex}`}
-                  onPointerDown={(event) => handleMainKeyPointerDown(key, event)}
-                  className={`
-                    h-12 rounded text-white font-semibold text-base
-                    ${activeColor}
-                    active:scale-95 transition-all select-none
-                    flex items-center justify-center
+              <button
+                key={`${key.label}-${keyIndex}`}
+                onPointerDown={(event) => handleMainKeyPointerDown(key, event)}
+                onPointerUp={(event) => releasePointerId(event.pointerId)}
+                onPointerCancel={(event) => releasePointerId(event.pointerId)}
+                onPointerLeave={(event) => releasePointerId(event.pointerId)}
+                className={`
+                  h-12 rounded text-white font-semibold text-base
+                  ${activeColor}
+                  active:scale-95 transition-all select-none
+                  flex items-center justify-center
                     touch-manipulation
                   `}
                   style={{ flex: key.width ?? 1, touchAction: 'manipulation' }}

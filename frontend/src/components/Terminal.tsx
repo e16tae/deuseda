@@ -35,10 +35,12 @@ export function Terminal({ sessionId }: TerminalProps) {
     window.addEventListener('resize', updateHeight);
     const viewport = window.visualViewport;
     viewport?.addEventListener('resize', updateHeight);
+    viewport?.addEventListener('scroll', updateHeight);
 
     return () => {
       window.removeEventListener('resize', updateHeight);
       viewport?.removeEventListener('resize', updateHeight);
+      viewport?.removeEventListener('scroll', updateHeight);
     };
   }, [isMobile]);
 
@@ -246,8 +248,12 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
+  const bottomSafeGap = 12;
   const terminalHeight = isMobile && availableHeight
-    ? Math.max(availableHeight - keypadHeight, 200)
+    ? Math.max(availableHeight - bottomSafeGap, 200)
+    : undefined;
+  const terminalPaddingBottom = isMobile
+    ? `${Math.max(keypadHeight + bottomSafeGap, bottomSafeGap)}px`
     : undefined;
 
   const handleTerminalTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
@@ -321,7 +327,7 @@ export function Terminal({ sessionId }: TerminalProps) {
         ref={terminalRef}
         className="h-full w-full overflow-hidden"
         style={isMobile ? {
-          paddingBottom: `${keypadHeight}px`,
+          paddingBottom: terminalPaddingBottom,
           height: terminalHeight ? `${terminalHeight}px` : '100%',
           touchAction: 'none'
         } : undefined}
