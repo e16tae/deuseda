@@ -41,9 +41,18 @@ async fn main() -> anyhow::Result<()> {
     // Protected routes (require authentication)
     let protected_routes = Router::new()
         .route("/api/sessions", get(handlers::session::list_sessions))
-        .route("/api/terminal-sessions", get(handlers::terminal_session::get_sessions))
-        .route("/api/terminal-sessions", post(handlers::terminal_session::create_session))
-        .route("/api/terminal-sessions/:session_id", delete(handlers::terminal_session::delete_session))
+        .route(
+            "/api/terminal-sessions",
+            get(handlers::terminal_session::get_sessions),
+        )
+        .route(
+            "/api/terminal-sessions",
+            post(handlers::terminal_session::create_session),
+        )
+        .route(
+            "/api/terminal-sessions/:session_id",
+            delete(handlers::terminal_session::delete_session),
+        )
         .route_layer(axum_middleware::from_fn_with_state(
             db_pool.clone(),
             middleware::auth_middleware,

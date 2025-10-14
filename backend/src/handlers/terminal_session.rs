@@ -99,17 +99,16 @@ pub async fn delete_session(
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let result = sqlx::query(
-        "DELETE FROM terminal_sessions WHERE user_id = $1 AND session_id = $2",
-    )
-    .bind(user_id)
-    .bind(session_id)
-    .execute(&pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to delete terminal session: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let result =
+        sqlx::query("DELETE FROM terminal_sessions WHERE user_id = $1 AND session_id = $2")
+            .bind(user_id)
+            .bind(session_id)
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to delete terminal session: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     if result.rows_affected() == 0 {
         return Err(StatusCode::NOT_FOUND);
