@@ -10,14 +10,19 @@
      --env-file .env.postgres \
      --namespace deuseda \
      --name postgres-secret \
+     --controller-namespace kube-system \
+     --controller-name sealed-secrets \
      --out k8s/sealed-secrets/postgres-secret.sealedsecret.yaml
 
    ./scripts/seal-secrets.sh \
      --manifest k8s/base/secret-template.yaml \
      --namespace deuseda \
+     --controller-namespace kube-system \
+     --controller-name sealed-secrets \
      --out k8s/sealed-secrets/backend-secret.sealedsecret.yaml
    ```
    > `--manifest` 모드는 Secret YAML(하나의 문서)에 값을 직접 채운 뒤 암호화할 때 사용합니다.
+   > 다중 문서 템플릿(`---`)을 사용할 경우에는 리소스별로 분리한 파일을 만들어 실행하세요.
 
 4. 생성된 `*.sealedsecret.yaml` 파일을 커밋 → GitOps 파이프라인에서 자동 적용
 
