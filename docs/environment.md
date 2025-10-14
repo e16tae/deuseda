@@ -106,29 +106,28 @@ VITE_API_BASE_URL=http://localhost:8080
 
 ## Kubernetes Secrets
 
-1. **PostgreSQL 비밀번호**
+### Sealed Secrets 권장 워크플로
+1. `k8s/base/secret-template.yaml` 또는 `secret.example.yaml`을 복사해 실제 값으로 채웁니다.
+2. `./scripts/seal-secrets.sh` 실행
    ```bash
-   kubectl create secret generic postgres-secret \
-     --from-literal=password='CHANGE_ME' \
-     --namespace=deuseda
-   ```
-2. **백엔드 환경 변수**
-   ```bash
-   kubectl create secret generic backend-secret \
-     --from-literal=database-url='postgresql://USER:PASS@postgres:5432/deuseda_console' \
-     --from-literal=jwt-secret='BASE64_RANDOM_64' \
-     --namespace=deuseda
-   ```
-3. **GHCR 인증**
-   ```bash
-   kubectl create secret docker-registry ghcr-secret \
-     --docker-server=ghcr.io \
-     --docker-username=YOUR_GITHUB_USERNAME \
-     --docker-password=YOUR_GITHUB_PAT \
-     --namespace=deuseda
-   ```
+   # PostgreSQL 비밀번호를 env 파일에서 읽어 암호화
+   ./scripts/seal-secrets.sh \\
+     --env-file .env.postgres \\
+     --name postgres-secret \\
+     --namespace deuseda \\
+     --out k8s/sealed-secrets/postgres-secret.sealedsecret.yaml
 
-> GitOps 방식(Sealed Secrets 등)을 사용할 경우 `kubeseal`로 암호화된 매니페스트를 생성해 커밋합니다.
+   # Secret manifest를 직접 암호화 (단일 문서)
+   ./scripts/seal-secrets.sh \\
+     --manifest k8s/base/secret-template.yaml \\
+     --out k8s/sealed-secrets/backend-secret.sealedsecret.yaml
+   ```
+3. 생성된 `k8s/sealed-secrets/*.sealedsecret.yaml` 파일을 커밋하여 ArgoCD가 적용하도록 합니다.
+
+### 기타 Secrets
+- GHCR Pull Secret: `kubectl create secret docker-registry ghcr-secret ...`
+- TLS certificates: `kubectl create secret tls deuseda-wildcard-tls ...` 또는 cert-manager 사용
+- 백업용 Cloudflare R2 자격 증명 등은 별도 SealedSecret으로 관리합니다.
 
 ## GitHub Secrets
 
@@ -152,4 +151,3 @@ VITE_API_BASE_URL=http://localhost:8080
 - **SSH 연결 실패**: `SSH_HOST`, 방화벽, authorized_keys 설정을 점검합니다.
 - **JWT 문제**: 프런트/백엔드에서 동일한 `JWT_SECRET`을 사용하고 있는지 확인합니다.
 - **데이터베이스 연결 오류**: `DATABASE_URL` 문자열, 포트, 네임스페이스를 다시 확인합니다.
-
