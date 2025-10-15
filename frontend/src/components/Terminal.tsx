@@ -21,6 +21,7 @@ export function Terminal({ sessionId }: TerminalProps) {
     height: null,
     keyboardHeight: 0,
   });
+  const [computedTerminalHeight, setComputedTerminalHeight] = useState<number | undefined>(undefined);
   const touchStateRef = useRef<{ lastY: number; accumulated: number } | null>(null);
   const lineHeightRef = useRef<number>(18);
 
@@ -259,8 +260,31 @@ export function Terminal({ sessionId }: TerminalProps) {
   const combinedKeyboardHeight = isMobile
     ? Math.max(keypadHeight, viewportMetrics.keyboardHeight)
     : 0;
-  const terminalHeight = isMobile && viewportMetrics.height
+
+  useEffect(() => {
+    if (!isMobile) {
+      setComputedTerminalHeight(undefined);
+      return;
+    }
+
+    const compute = () => {
+      if (!terminalRef.current) return;
+      const rect = terminalRef.current.getBoundingClientRect();
+      const available = window.innerHeight - rect.top - combinedKeyboardHeight - bottomSafeGap;
+      const nextHeight = Math.max(available, 200);
+      setComputedTerminalHeight((prev) => (prev !== nextHeight ? nextHeight : prev));
+    };
+
+    compute();
+    const raf = requestAnimationFrame(compute);
+    return () => cancelAnimationFrame(raf);
+  }, [combinedKeyboardHeight, isMobile, viewportMetrics.height]);
+
+  const fallbackTerminalHeight = isMobile && viewportMetrics.height
     ? Math.max(viewportMetrics.height - combinedKeyboardHeight - bottomSafeGap, 200)
+    : undefined;
+  const finalTerminalHeight = isMobile
+    ? (computedTerminalHeight ?? fallbackTerminalHeight)
     : undefined;
   const terminalPaddingBottom = isMobile
     ? `${combinedKeyboardHeight + bottomSafeGap}px`
@@ -338,7 +362,7 @@ export function Terminal({ sessionId }: TerminalProps) {
         className="h-full w-full overflow-hidden"
         style={isMobile ? {
           paddingBottom: terminalPaddingBottom,
-          height: terminalHeight ? `${terminalHeight}px` : '100%',
+          height: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : '100%',
           touchAction: 'none'
         } : undefined}
         onTouchStart={handleTerminalTouchStart}
