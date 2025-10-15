@@ -22,8 +22,9 @@ export function Terminal({ sessionId }: TerminalProps) {
     keyboardHeight: 0,
   });
   const [computedTerminalHeight, setComputedTerminalHeight] = useState<number | undefined>(undefined);
-  const touchStateRef = useRef<{ lastY: number; accumulated: number } | null>(null);
+  const touchStateRef = useRef<{ lastY: number; pending: number; accumulated: number; scrolling: boolean } | null>(null);
   const lineHeightRef = useRef<number>(18);
+  const TOUCH_SCROLL_THRESHOLD = 12;
   const detachTouchHandlersRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -289,6 +290,36 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
+  const handleKeyboardCommand = async (command: 'copySelection') => {
+    if (command !== 'copySelection') {
+      return;
+    }
+
+    const selection = xtermRef.current?.getSelection?.();
+    if (!selection) {
+      console.warn('No terminal selection to copy');
+      return;
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(selection);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = selection;
+        textarea.setAttribute('readonly', 'true');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch (error) {
+      console.error('Failed to copy terminal selection', error);
+    }
+  };
+
   const bottomSafeGap = 8;
   const combinedKeyboardHeight = isMobile
     ? Math.max(keypadHeight, viewportMetrics.keyboardHeight)
@@ -337,21 +368,6 @@ export function Terminal({ sessionId }: TerminalProps) {
     return () => cancelAnimationFrame(raf);
   }, [finalTerminalHeight]);
 
-  const getAverageTouchY = (touches: TouchList) => {
-    if (touches.length === 0) {
-      return 0;
-    }
-
-    let sum = 0;
-    for (let i = 0; i < touches.length; i += 1) {
-      const touch = touches.item(i);
-      if (touch) {
-        sum += touch.clientY;
-      }
-    }
-    return sum / touches.length;
-  };
-
   const handleTerminalTouchStart = (e: TouchEvent) => {
     if (!isMobile) {
       return;
@@ -362,31 +378,25 @@ export function Terminal({ sessionId }: TerminalProps) {
       e.preventDefault();
     }
 
-    if (e.touches.length < 2) {
+    if (e.touches.length !== 1) {
       touchStateRef.current = null;
       return;
     }
 
-    e.preventDefault();
-    e.stopPropagation();
-
-    const averageY = getAverageTouchY(e.touches);
-    touchStateRef.current = { lastY: averageY, accumulated: 0 };
-
-    const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
-    if (rowElement) {
-      const height = rowElement.getBoundingClientRect().height;
-      if (height > 0) {
-        lineHeightRef.current = height;
-      }
-    }
+    const touch = e.touches[0];
+    touchStateRef.current = {
+      lastY: touch.clientY,
+      pending: 0,
+      accumulated: 0,
+      scrolling: false,
+    };
   };
 
   const handleTerminalTouchMove = (e: TouchEvent) => {
     if (!isMobile) {
       return;
     }
-    if (e.touches.length < 2) {
+    if (e.touches.length !== 1) {
       touchStateRef.current = null;
       return;
     }
@@ -397,9 +407,29 @@ export function Terminal({ sessionId }: TerminalProps) {
       return;
     }
 
-    const currentY = getAverageTouchY(e.touches);
-    const deltaY = currentY - state.lastY;
-    state.lastY = currentY;
+    const touch = e.touches[0];
+    const deltaY = touch.clientY - state.lastY;
+    state.lastY = touch.clientY;
+
+    if (!state.scrolling) {
+      state.pending += deltaY;
+      if (Math.abs(state.pending) < TOUCH_SCROLL_THRESHOLD) {
+        return;
+      }
+
+      state.scrolling = true;
+      state.pending = 0;
+      state.accumulated = 0;
+
+      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
+      if (rowElement) {
+        const height = rowElement.getBoundingClientRect().height;
+        if (height > 0) {
+          lineHeightRef.current = height;
+        }
+      }
+    }
+
     state.accumulated += deltaY;
 
     const lineHeight = lineHeightRef.current || 18;
@@ -414,6 +444,7 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
 
     e.preventDefault();
+    e.stopPropagation();
   };
 
   const handleTerminalTouchEnd = () => {
@@ -442,6 +473,7 @@ export function Terminal({ sessionId }: TerminalProps) {
         <VirtualKeyboard
           onKeyPress={handleSpecialKey}
           onHeightChange={setKeypadHeight}
+          onCommand={handleKeyboardCommand}
         />
       )}
     </div>
