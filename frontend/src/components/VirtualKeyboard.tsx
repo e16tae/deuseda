@@ -665,7 +665,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       ref={containerRef}
       className="fixed bottom-0 left-0 right-0 bg-gray-950 border-t border-gray-700 z-50 pb-safe shadow-2xl"
     >
-      <div className="px-2 pt-2 pb-1 border-b border-gray-800">
+      <div className="px-2 pt-1 pb-1 border-b border-gray-800">
         <div
           className="flex items-center gap-1 overflow-x-auto flex-nowrap"
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
@@ -703,7 +703,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
         </div>
       </div>
 
-      <div className="px-2 pb-2 space-y-1">
+      <div className="px-2 pb-1.5 space-y-1">
         {currentLayout.map((row, rowIndex) => (
           <div key={rowIndex} className="flex gap-1 justify-center">
             {row.map((key, keyIndex) => {
