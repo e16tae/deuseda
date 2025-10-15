@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 interface VirtualKeyboardProps {
   onKeyPress: (key: string) => void;
   onHeightChange?: (height: number) => void;
+  onCommand?: (command: 'copySelection') => void;
 }
 
 type KeyboardLayout = 'letters' | 'korean' | 'symbols' | 'symbolsMore';
@@ -24,6 +25,7 @@ interface ExtraKey {
   value?: string;
   color?: string;
   modifier?: 'ctrl' | 'alt';
+  command?: 'copySelection';
   width?: number;
 }
 
@@ -141,6 +143,7 @@ const EXTRA_KEYS: ExtraKey[] = [
   { label: 'Tab', value: '\t', color: 'bg-gray-600 hover:bg-gray-500' },
   { label: 'Ctrl', modifier: 'ctrl', color: 'bg-purple-600 hover:bg-purple-500' },
   { label: 'Alt', modifier: 'alt', color: 'bg-purple-600 hover:bg-purple-500' },
+  { label: 'Copy', command: 'copySelection', color: 'bg-emerald-600 hover:bg-emerald-500' },
   { label: '^C', value: '\x03', color: 'bg-yellow-600 hover:bg-yellow-500' },
   { label: '^D', value: '\x04', color: 'bg-orange-600 hover:bg-orange-500' },
   { label: '^Z', value: '\x1a', color: 'bg-purple-600 hover:bg-purple-500' },
@@ -260,7 +263,7 @@ const SYMBOLS_MORE_LAYOUT: KeyboardKey[][] = [
   ],
 ];
 
-export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardProps) {
+export function VirtualKeyboard({ onKeyPress, onHeightChange, onCommand }: VirtualKeyboardProps) {
   const [layout, setLayout] = useState<KeyboardLayout>('letters');
   const [shiftPressed, setShiftPressed] = useState(false);
   const [ctrlPressed, setCtrlPressed] = useState(false);
@@ -638,6 +641,11 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
 
     flushHangulState();
     setShiftPressed(false);
+
+    if (key.command) {
+      onCommand?.(key.command);
+      return;
+    }
 
     if (key.modifier === 'ctrl') {
       setCtrlPressed((prev) => !prev);
