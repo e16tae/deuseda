@@ -289,7 +289,7 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
-  const bottomSafeGap = 16;
+  const bottomSafeGap = 8;
   const combinedKeyboardHeight = isMobile
     ? Math.max(keypadHeight, viewportMetrics.keyboardHeight)
     : 0;
@@ -337,6 +337,21 @@ export function Terminal({ sessionId }: TerminalProps) {
     return () => cancelAnimationFrame(raf);
   }, [finalTerminalHeight]);
 
+  const getAverageTouchY = (touches: TouchList) => {
+    if (touches.length === 0) {
+      return 0;
+    }
+
+    let sum = 0;
+    for (let i = 0; i < touches.length; i += 1) {
+      const touch = touches.item(i);
+      if (touch) {
+        sum += touch.clientY;
+      }
+    }
+    return sum / touches.length;
+  };
+
   const handleTerminalTouchStart = (e: TouchEvent) => {
     if (!isMobile) {
       return;
@@ -347,16 +362,19 @@ export function Terminal({ sessionId }: TerminalProps) {
       e.preventDefault();
     }
 
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      touchStateRef.current = { lastY: touch.clientY, accumulated: 0 };
+    if (e.touches.length < 2) {
+      touchStateRef.current = null;
+      return;
+    }
 
-      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
-      if (rowElement) {
-        const height = rowElement.getBoundingClientRect().height;
-        if (height > 0) {
-          lineHeightRef.current = height;
-        }
+    const averageY = getAverageTouchY(e.touches);
+    touchStateRef.current = { lastY: averageY, accumulated: 0 };
+
+    const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
+    if (rowElement) {
+      const height = rowElement.getBoundingClientRect().height;
+      if (height > 0) {
+        lineHeightRef.current = height;
       }
     }
   };
@@ -365,7 +383,8 @@ export function Terminal({ sessionId }: TerminalProps) {
     if (!isMobile) {
       return;
     }
-    if (e.touches.length !== 1) {
+    if (e.touches.length < 2) {
+      touchStateRef.current = null;
       return;
     }
 
@@ -375,7 +394,7 @@ export function Terminal({ sessionId }: TerminalProps) {
       return;
     }
 
-    const currentY = e.touches[0].clientY;
+    const currentY = getAverageTouchY(e.touches);
     const deltaY = currentY - state.lastY;
     state.lastY = currentY;
     state.accumulated += deltaY;
@@ -411,7 +430,7 @@ export function Terminal({ sessionId }: TerminalProps) {
           paddingBottom: terminalPaddingBottom,
           height: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : '100%',
           maxHeight: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : undefined,
-          touchAction: 'none'
+          touchAction: 'auto'
         } : undefined}
       />
 
