@@ -635,7 +635,10 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       className="fixed bottom-0 left-0 right-0 bg-gray-950 border-t border-gray-700 z-50 pb-safe shadow-2xl"
     >
       <div className="px-2 pt-2 pb-1 border-b border-gray-800">
-        <div className="flex flex-wrap justify-center gap-1">
+        <div
+          className="flex items-center gap-1 overflow-x-auto flex-nowrap"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {EXTRA_KEYS.map((key) => {
             const isActive =
               (key.modifier === 'ctrl' && ctrlPressed) ||
@@ -654,7 +657,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
                 onPointerCancel={(event) => releasePointerId(event.pointerId)}
                 onPointerLeave={(event) => releasePointerId(event.pointerId)}
                 className={`
-                  h-10 px-3 rounded text-white font-mono text-xs font-semibold
+                  h-10 px-3 rounded text-white font-mono text-xs font-semibold shrink-0
                   ${activeColor}
                   active:scale-95 transition-all select-none
                   flex items-center justify-center

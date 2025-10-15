@@ -248,12 +248,13 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
-  const bottomSafeGap = 12;
+  const bottomSafeGap = 16;
+  const effectiveKeypadHeight = isMobile ? keypadHeight : 0;
   const terminalHeight = isMobile && availableHeight
-    ? Math.max(availableHeight - bottomSafeGap, 200)
+    ? Math.max(availableHeight - effectiveKeypadHeight - bottomSafeGap, 200)
     : undefined;
   const terminalPaddingBottom = isMobile
-    ? `${Math.max(keypadHeight + bottomSafeGap, bottomSafeGap)}px`
+    ? `${Math.max(effectiveKeypadHeight + bottomSafeGap, bottomSafeGap)}px`
     : undefined;
 
   const handleTerminalTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
