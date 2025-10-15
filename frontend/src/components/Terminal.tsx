@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -24,6 +24,7 @@ export function Terminal({ sessionId }: TerminalProps) {
   const [computedTerminalHeight, setComputedTerminalHeight] = useState<number | undefined>(undefined);
   const touchStateRef = useRef<{ lastY: number; accumulated: number } | null>(null);
   const lineHeightRef = useRef<number>(18);
+  const detachTouchHandlersRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!isMobile) {
@@ -139,6 +140,37 @@ export function Terminal({ sessionId }: TerminalProps) {
       }
     }
 
+    const attachTouchHandlers = () => {
+      if (!isMobile) {
+        detachTouchHandlersRef.current = () => {};
+        return;
+      }
+
+      const viewportElement = terminalRef.current?.querySelector('.xterm-viewport') as HTMLElement | null;
+      if (!viewportElement) {
+        detachTouchHandlersRef.current = () => {};
+        return;
+      }
+
+      const onTouchStart = (event: TouchEvent) => handleTerminalTouchStart(event);
+      const onTouchMove = (event: TouchEvent) => handleTerminalTouchMove(event);
+      const onTouchEnd = () => handleTerminalTouchEnd();
+
+      viewportElement.addEventListener('touchstart', onTouchStart, { passive: false });
+      viewportElement.addEventListener('touchmove', onTouchMove, { passive: false });
+      viewportElement.addEventListener('touchend', onTouchEnd, { passive: false });
+      viewportElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+      detachTouchHandlersRef.current = () => {
+        viewportElement.removeEventListener('touchstart', onTouchStart);
+        viewportElement.removeEventListener('touchmove', onTouchMove);
+        viewportElement.removeEventListener('touchend', onTouchEnd);
+        viewportElement.removeEventListener('touchcancel', onTouchEnd);
+      };
+    };
+
+    attachTouchHandlers();
+
     // Fit after terminal is mounted
     setTimeout(() => {
       try {
@@ -242,6 +274,7 @@ export function Terminal({ sessionId }: TerminalProps) {
       if (observer) {
         observer.disconnect();
       }
+      detachTouchHandlersRef.current();
       resizeDisposable.dispose();
       renderDisposable.dispose();
       window.removeEventListener('resize', handleResize);
@@ -290,13 +323,27 @@ export function Terminal({ sessionId }: TerminalProps) {
     ? `${combinedKeyboardHeight + bottomSafeGap}px`
     : undefined;
 
-  const handleTerminalTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+  useEffect(() => {
+    if (!fitAddonRef.current) {
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      try {
+        fitAddonRef.current?.fit();
+      } catch (error) {
+        console.error('Failed to fit terminal after resize:', error);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [finalTerminalHeight]);
+
+  const handleTerminalTouchStart = (e: TouchEvent) => {
     if (!isMobile) {
       return;
     }
 
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'TEXTAREA' || target.querySelector('textarea')) {
+    const target = e.target as HTMLElement | null;
+    if (target?.tagName === 'TEXTAREA' || target?.querySelector('textarea')) {
       e.preventDefault();
     }
 
@@ -314,7 +361,7 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
-  const handleTerminalTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+  const handleTerminalTouchMove = (e: TouchEvent) => {
     if (!isMobile) {
       return;
     }
@@ -363,12 +410,9 @@ export function Terminal({ sessionId }: TerminalProps) {
         style={isMobile ? {
           paddingBottom: terminalPaddingBottom,
           height: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : '100%',
+          maxHeight: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : undefined,
           touchAction: 'none'
         } : undefined}
-        onTouchStart={handleTerminalTouchStart}
-        onTouchMove={handleTerminalTouchMove}
-        onTouchEnd={handleTerminalTouchEnd}
-        onTouchCancel={handleTerminalTouchEnd}
       />
 
       {/* Virtual Keyboard - full QWERTY layout on mobile */}
