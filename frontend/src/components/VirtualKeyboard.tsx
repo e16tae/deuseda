@@ -34,6 +34,12 @@ interface HangulState {
   lastOutput: string;
 }
 
+interface PointerMeta {
+  startX: number;
+  startY: number;
+  cancelled: boolean;
+}
+
 const CHOSEONG_LIST: string[] = [
   'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ',
   'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ',
@@ -267,6 +273,8 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     lastOutput: '',
   });
   const activePointerIdsRef = useRef<Set<number>>(new Set());
+  const extraPointerMetaRef = useRef<Map<number, PointerMeta>>(new Map());
+  const EXTRA_KEY_SCROLL_THRESHOLD = 10;
 
   useEffect(() => {
     if (!containerRef.current || !onHeightChange) {
@@ -286,20 +294,6 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       return () => resizeObserver.disconnect();
     }
   }, [layout, onHeightChange]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const preventScroll = (e: TouchEvent) => {
-      e.preventDefault();
-    };
-
-    container.addEventListener('touchmove', preventScroll, { passive: false });
-    return () => {
-      container.removeEventListener('touchmove', preventScroll);
-    };
-  }, []);
 
   const sendKeyValue = (
     rawValue: string | undefined,
@@ -581,6 +575,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       return;
     }
     activePointerIdsRef.current.delete(pointerId);
+    extraPointerMetaRef.current.delete(pointerId);
   };
 
   const handleMainKeyPointerDown = (key: KeyboardKey, event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -599,18 +594,46 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     event.currentTarget.blur();
   };
 
-  const handleExtraKeyPointerDown = (key: ExtraKey, event: ReactPointerEvent<HTMLButtonElement>) => {
+  const handleExtraKeyPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (activePointerIdsRef.current.has(event.pointerId)) {
-      event.preventDefault();
-      event.stopPropagation();
       return;
     }
     activePointerIdsRef.current.add(event.pointerId);
-    event.preventDefault();
-    event.stopPropagation();
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    extraPointerMetaRef.current.set(event.pointerId, {
+      startX: event.clientX,
+      startY: event.clientY,
+      cancelled: false,
+    });
+  };
+
+  const handleExtraKeyPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const meta = extraPointerMetaRef.current.get(event.pointerId);
+    if (!meta || meta.cancelled) {
+      return;
+    }
+
+    const deltaX = Math.abs(event.clientX - meta.startX);
+    const deltaY = Math.abs(event.clientY - meta.startY);
+    if (deltaX > EXTRA_KEY_SCROLL_THRESHOLD || deltaY > EXTRA_KEY_SCROLL_THRESHOLD) {
+      meta.cancelled = true;
+    }
+  };
+
+  const handleExtraKeyPointerUp = (key: ExtraKey, event: ReactPointerEvent<HTMLButtonElement>) => {
+    const meta = extraPointerMetaRef.current.get(event.pointerId);
+    const wasCancelled = meta?.cancelled ?? true;
+
+    releasePointerId(event.pointerId);
+
+    if (wasCancelled) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.blur();
 
     flushHangulState();
@@ -629,6 +652,14 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
     sendKeyValue(key.value);
   };
 
+  const handleExtraKeyPointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const meta = extraPointerMetaRef.current.get(event.pointerId);
+    if (meta) {
+      meta.cancelled = true;
+    }
+    releasePointerId(event.pointerId);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -637,7 +668,7 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
       <div className="px-2 pt-2 pb-1 border-b border-gray-800">
         <div
           className="flex items-center gap-1 overflow-x-auto flex-nowrap"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}
         >
           {EXTRA_KEYS.map((key) => {
             const isActive =
@@ -652,18 +683,18 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
             return (
               <button
                 key={key.label}
-                onPointerDown={(event) => handleExtraKeyPointerDown(key, event)}
-                onPointerUp={(event) => releasePointerId(event.pointerId)}
-                onPointerCancel={(event) => releasePointerId(event.pointerId)}
-                onPointerLeave={(event) => releasePointerId(event.pointerId)}
+                onPointerDown={handleExtraKeyPointerDown}
+                onPointerMove={handleExtraKeyPointerMove}
+                onPointerUp={(event) => handleExtraKeyPointerUp(key, event)}
+                onPointerCancel={handleExtraKeyPointerCancel}
+                onPointerLeave={handleExtraKeyPointerCancel}
                 className={`
                   h-10 px-3 rounded text-white font-mono text-xs font-semibold shrink-0
                   ${activeColor}
                   active:scale-95 transition-all select-none
                   flex items-center justify-center
-                  touch-manipulation
                 `}
-                style={{ touchAction: 'manipulation' }}
+                style={{ touchAction: 'pan-x' }}
               >
                 {key.label}
               </button>
@@ -690,17 +721,17 @@ export function VirtualKeyboard({ onKeyPress, onHeightChange }: VirtualKeyboardP
                 : baseColor;
 
               return (
-              <button
-                key={`${key.label}-${keyIndex}`}
-                onPointerDown={(event) => handleMainKeyPointerDown(key, event)}
-                onPointerUp={(event) => releasePointerId(event.pointerId)}
-                onPointerCancel={(event) => releasePointerId(event.pointerId)}
-                onPointerLeave={(event) => releasePointerId(event.pointerId)}
-                className={`
-                  h-12 rounded text-white font-semibold text-base
-                  ${activeColor}
-                  active:scale-95 transition-all select-none
-                  flex items-center justify-center
+                <button
+                  key={`${key.label}-${keyIndex}`}
+                  onPointerDown={(event) => handleMainKeyPointerDown(key, event)}
+                  onPointerUp={(event) => releasePointerId(event.pointerId)}
+                  onPointerCancel={(event) => releasePointerId(event.pointerId)}
+                  onPointerLeave={(event) => releasePointerId(event.pointerId)}
+                  className={`
+                    h-12 rounded text-white font-semibold text-base
+                    ${activeColor}
+                    active:scale-95 transition-all select-none
+                    flex items-center justify-center
                     touch-manipulation
                   `}
                   style={{ flex: key.width ?? 1, touchAction: 'manipulation' }}

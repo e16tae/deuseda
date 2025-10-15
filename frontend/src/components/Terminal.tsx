@@ -17,30 +17,37 @@ export function Terminal({ sessionId }: TerminalProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const isMobile = useIsMobile();
   const [keypadHeight, setKeypadHeight] = useState(0);
-  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  const [viewportMetrics, setViewportMetrics] = useState<{ height: number | null; keyboardHeight: number }>({
+    height: null,
+    keyboardHeight: 0,
+  });
   const touchStateRef = useRef<{ lastY: number; accumulated: number } | null>(null);
   const lineHeightRef = useRef<number>(18);
 
   useEffect(() => {
     if (!isMobile) {
-      setAvailableHeight(null);
+      setViewportMetrics({ height: null, keyboardHeight: 0 });
       return;
     }
 
-    const updateHeight = () => {
-      setAvailableHeight(window.visualViewport?.height ?? window.innerHeight);
+    const updateMetrics = () => {
+      const viewport = window.visualViewport;
+      const height = viewport?.height ?? window.innerHeight;
+      const offsetTop = viewport?.offsetTop ?? 0;
+      const viewportKeyboardHeight = Math.max(0, window.innerHeight - height - offsetTop);
+      setViewportMetrics({ height, keyboardHeight: viewportKeyboardHeight });
     };
 
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
+    updateMetrics();
+    window.addEventListener('resize', updateMetrics);
     const viewport = window.visualViewport;
-    viewport?.addEventListener('resize', updateHeight);
-    viewport?.addEventListener('scroll', updateHeight);
+    viewport?.addEventListener('resize', updateMetrics);
+    viewport?.addEventListener('scroll', updateMetrics);
 
     return () => {
-      window.removeEventListener('resize', updateHeight);
-      viewport?.removeEventListener('resize', updateHeight);
-      viewport?.removeEventListener('scroll', updateHeight);
+      window.removeEventListener('resize', updateMetrics);
+      viewport?.removeEventListener('resize', updateMetrics);
+      viewport?.removeEventListener('scroll', updateMetrics);
     };
   }, [isMobile]);
 
@@ -249,12 +256,14 @@ export function Terminal({ sessionId }: TerminalProps) {
   };
 
   const bottomSafeGap = 16;
-  const effectiveKeypadHeight = isMobile ? keypadHeight : 0;
-  const terminalHeight = isMobile && availableHeight
-    ? Math.max(availableHeight - effectiveKeypadHeight - bottomSafeGap, 200)
+  const combinedKeyboardHeight = isMobile
+    ? Math.max(keypadHeight, viewportMetrics.keyboardHeight)
+    : 0;
+  const terminalHeight = isMobile && viewportMetrics.height
+    ? Math.max(viewportMetrics.height - combinedKeyboardHeight - bottomSafeGap, 200)
     : undefined;
   const terminalPaddingBottom = isMobile
-    ? `${Math.max(effectiveKeypadHeight + bottomSafeGap, bottomSafeGap)}px`
+    ? `${combinedKeyboardHeight + bottomSafeGap}px`
     : undefined;
 
   const handleTerminalTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
