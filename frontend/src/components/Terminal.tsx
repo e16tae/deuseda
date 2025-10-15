@@ -367,6 +367,9 @@ export function Terminal({ sessionId }: TerminalProps) {
       return;
     }
 
+    e.preventDefault();
+    e.stopPropagation();
+
     const averageY = getAverageTouchY(e.touches);
     touchStateRef.current = { lastY: averageY, accumulated: 0 };
 
