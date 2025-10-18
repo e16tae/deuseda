@@ -1,4 +1,4 @@
-use crate::{db::DbPool, models::*};
+use crate::models::*;
 use anyhow::{anyhow, Result};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use std::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,
+    pub sub: String, // username
     pub exp: usize,
 }
 
@@ -44,32 +44,14 @@ fn verify_ssh_credentials(username: &str, password: &str) -> Result<bool> {
     }
 }
 
-pub async fn authenticate_user(pool: &DbPool, req: LoginRequest) -> Result<LoginResponse> {
+/// Authenticate user via SSH and generate JWT token (no database required)
+pub async fn authenticate_user(req: LoginRequest) -> Result<LoginResponse> {
     // SSH를 통한 실제 리눅스 계정 인증
     verify_ssh_credentials(&req.username, &req.password)?;
 
-    // 인증 성공 시 사용자 정보 조회 또는 생성
-    let user = match sqlx::query_as::<_, User>("SELECT * FROM users WHERE username = $1")
-        .bind(&req.username)
-        .fetch_optional(pool)
-        .await?
-    {
-        Some(user) => user,
-        None => {
-            // 첫 로그인 시 사용자 정보 생성 (password는 저장하지 않음)
-            sqlx::query_as::<_, User>(
-                "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING *",
-            )
-            .bind(&req.username)
-            .bind("") // SSH 인증을 사용하므로 빈 문자열
-            .fetch_one(pool)
-            .await?
-        }
-    };
-
-    // Generate JWT token
+    // Generate JWT token with username as subject
     let claims = Claims {
-        sub: user.id.to_string(),
+        sub: req.username.clone(), // username directly in JWT
         exp: (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as usize,
     };
 
@@ -83,9 +65,6 @@ pub async fn authenticate_user(pool: &DbPool, req: LoginRequest) -> Result<Login
 
     Ok(LoginResponse {
         token,
-        user: UserInfo {
-            id: user.id,
-            username: user.username,
-        },
+        username: req.username,
     })
 }

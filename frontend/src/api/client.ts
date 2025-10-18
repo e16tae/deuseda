@@ -23,12 +23,21 @@ export interface CreateTerminalSessionRequest {
   title: string;
 }
 
-function getAuthHeaders(): HeadersInit {
+function getAuthHeaders(includePassword = false): HeadersInit {
   const token = localStorage.getItem('token');
-  return {
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
   };
+
+  if (includePassword) {
+    const password = localStorage.getItem('password');
+    if (password) {
+      headers['X-SSH-Password'] = password;
+    }
+  }
+
+  return headers;
 }
 
 export const apiClient = {
@@ -52,7 +61,7 @@ export const apiClient = {
   async getTerminalSessions(): Promise<TerminalSession[]> {
     const response = await fetch(`${API_BASE_URL}/api/terminal-sessions`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(true), // Include SSH password
     });
 
     if (!response.ok) {
@@ -65,7 +74,7 @@ export const apiClient = {
   async createTerminalSession(data: CreateTerminalSessionRequest): Promise<TerminalSession> {
     const response = await fetch(`${API_BASE_URL}/api/terminal-sessions`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(true), // Include SSH password
       body: JSON.stringify(data),
     });
 
@@ -79,7 +88,7 @@ export const apiClient = {
   async deleteTerminalSession(sessionId: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/terminal-sessions/${sessionId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders(true), // Include SSH password
     });
 
     if (!response.ok && response.status !== 204) {

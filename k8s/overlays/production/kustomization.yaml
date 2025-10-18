@@ -43,9 +43,3 @@ patchesJson6902:
       kind: SealedSecret
       name: prod-backend-secret
     path: sealedsecret-backend-name-patch.yaml
-  - target:
-      group: bitnami.com
-      version: v1alpha1
-      kind: SealedSecret
-      name: prod-postgres-secret
-    path: sealedsecret-postgres-name-patch.yaml

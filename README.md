@@ -6,12 +6,14 @@
 - SSH 자격 증명을 이용한 1차 인증 (비밀번호 저장 없음)
 - 옵션형 2단계 인증(예: TOTP) 확장 가능 구조
 - 다중 터미널 세션 및 탭 기반 UI
-- tmux 기반 세션 지속성 (브라우저 종료 후에도 유지)
+- **tmux 기반 세션 지속성** - 사용자의 실제 tmux 세션과 완전 동기화
 - WebSocket 스트리밍을 통한 실시간 입출력
+- 웹 UI와 SSH 터미널 간 세션 공유 (동일한 tmux 세션 접근)
 
 ## 기술 스택
-- **Backend**: Rust, Axum, Tokio, SQLx, PostgreSQL, tmux
-- **Frontend**: React 18, TypeScript, Vite, xterm.js, Tailwind CSS
+- **Backend**: Rust, Axum, Tokio (Stateless JWT 기반)
+- **Session Management**: tmux (사용자 SSH 서버의 실제 tmux 세션 활용)
+- **Frontend**: React 19, TypeScript, Vite, xterm.js, Tailwind CSS
 - **Infrastructure**: Docker Compose, Kubernetes, ArgoCD, Kong Gateway, GHCR
 
 ## 저장소 구조
@@ -76,7 +78,6 @@ npm run dev
 ## 유지보수 팁
 - SSH 서버 보안 정책(패스워드 정책, Fail2ban 등)을 정기적으로 점검하세요.
 - `cargo audit`, `npm audit`을 주기적으로 실행하여 취약점을 확인합니다.
-- PostgreSQL 백업은 월 1회 이상 복원 테스트를 수행합니다.
 - 저장소를 새롭게 공개할 때는 `reset-git-history.sh` 스크립트로 깔끔한 초기 커밋을 준비하세요.
 - 자동화 에이전트가 수행한 작업은 `agent/<issue-id>-slug` 브랜치에서 검토 후 develop/main에 병합합니다.
 - 환경 변수는 `./scripts/seal-secrets.sh`로 암호화한 뒤 `k8s/sealed-secrets/`에 커밋해 GitOps 파이프라인에서 관리합니다.

@@ -1,39 +1,74 @@
 use axum::{
-    extract::{Path, State},
-    http::StatusCode,
+    extract::Path,
+    http::{HeaderMap, StatusCode},
     Extension, Json,
 };
-use uuid::Uuid;
+use ssh2::Session;
+use std::net::TcpStream;
 
 use crate::{
-    db::DbPool,
     middleware::auth::Claims,
-    models::{CreateTerminalSessionRequest, TerminalSession, TerminalSessionResponse},
+    models::{CreateTerminalSessionRequest, TerminalSessionResponse},
+    terminal::{
+        create_tmux_session_via_ssh, kill_tmux_session_via_ssh, list_tmux_sessions_via_ssh,
+    },
 };
 
 // GET /api/terminal-sessions - Get all terminal sessions for the current user
+// Requires X-SSH-Password header to connect to SSH and list tmux sessions
 pub async fn get_sessions(
     Extension(claims): Extension<Claims>,
-    State(pool): State<DbPool>,
+    headers: HeaderMap,
 ) -> Result<Json<Vec<TerminalSessionResponse>>, StatusCode> {
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    // Get username directly from JWT
+    let username = claims.username();
 
-    let sessions = sqlx::query_as::<_, TerminalSession>(
-        "SELECT * FROM terminal_sessions WHERE user_id = $1 ORDER BY created_at ASC",
-    )
-    .bind(user_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to fetch terminal sessions: {}", e);
+    // Get password from header
+    let password = headers
+        .get("X-SSH-Password")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Connect to SSH and list tmux sessions
+    let ssh_host = std::env::var("SSH_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ssh_port = std::env::var("SSH_PORT")
+        .unwrap_or_else(|_| "22".to_string())
+        .parse::<u16>()
+        .unwrap_or(22);
+
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let response: Vec<TerminalSessionResponse> = sessions
+    let mut session = Session::new().map_err(|e| {
+        tracing::error!("Failed to create SSH session: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.set_tcp_stream(tcp);
+    session.handshake().map_err(|e| {
+        tracing::error!("SSH handshake failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    // List tmux sessions
+    let tmux_sessions = list_tmux_sessions_via_ssh(&mut session).map_err(|e| {
+        tracing::error!("Failed to list tmux sessions: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Convert to response format
+    let response: Vec<TerminalSessionResponse> = tmux_sessions
         .into_iter()
         .map(|s| TerminalSessionResponse {
-            id: s.session_id,
-            title: s.title,
+            id: s.name.clone(),
+            title: s.name,
         })
         .collect();
 
@@ -41,78 +76,139 @@ pub async fn get_sessions(
 }
 
 // POST /api/terminal-sessions - Create a new terminal session
+// Requires X-SSH-Password header to connect to SSH and create tmux session
 pub async fn create_session(
     Extension(claims): Extension<Claims>,
-    State(pool): State<DbPool>,
+    headers: HeaderMap,
     Json(req): Json<CreateTerminalSessionRequest>,
 ) -> Result<Json<TerminalSessionResponse>, StatusCode> {
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    // Get username directly from JWT
+    let username = claims.username();
 
-    // Check if session already exists
-    let existing = sqlx::query_as::<_, TerminalSession>(
-        "SELECT * FROM terminal_sessions WHERE user_id = $1 AND session_id = $2",
-    )
-    .bind(user_id)
-    .bind(&req.session_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to check existing session: {}", e);
+    // Get password from header
+    let password = headers
+        .get("X-SSH-Password")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    // Connect to SSH
+    let ssh_host = std::env::var("SSH_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ssh_port = std::env::var("SSH_PORT")
+        .unwrap_or_else(|_| "22".to_string())
+        .parse::<u16>()
+        .unwrap_or(22);
+
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    if let Some(session) = existing {
-        // Return existing session
-        return Ok(Json(TerminalSessionResponse {
-            id: session.session_id,
-            title: session.title,
-        }));
+    let mut session = Session::new().map_err(|e| {
+        tracing::error!("Failed to create SSH session: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.set_tcp_stream(tcp);
+    session.handshake().map_err(|e| {
+        tracing::error!("SSH handshake failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    // Check if session already exists, if not create it
+    let session_exists =
+        crate::terminal::tmux_session_exists_via_ssh(&mut session, &req.session_id).map_err(
+            |e| {
+                tracing::error!("Failed to check tmux session: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            },
+        )?;
+
+    if !session_exists {
+        // Create new tmux session
+        create_tmux_session_via_ssh(&mut session, &req.session_id).map_err(|e| {
+            tracing::error!("Failed to create tmux session: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+        tracing::info!("Created new tmux session: {}", req.session_id);
+    } else {
+        tracing::info!("Tmux session already exists: {}", req.session_id);
     }
 
-    // Create new session
-    let session = sqlx::query_as::<_, TerminalSession>(
-        "INSERT INTO terminal_sessions (user_id, session_id, title)
-         VALUES ($1, $2, $3)
-         RETURNING *",
-    )
-    .bind(user_id)
-    .bind(&req.session_id)
-    .bind(&req.title)
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to create terminal session: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
     Ok(Json(TerminalSessionResponse {
-        id: session.session_id,
-        title: session.title,
+        id: req.session_id.clone(),
+        title: req.title,
     }))
 }
 
 // DELETE /api/terminal-sessions/:session_id - Delete a terminal session
+// Requires X-SSH-Password header to connect to SSH and kill tmux session
 pub async fn delete_session(
     Extension(claims): Extension<Claims>,
-    State(pool): State<DbPool>,
+    headers: HeaderMap,
     Path(session_id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    // Get username directly from JWT
+    let username = claims.username();
 
-    let result =
-        sqlx::query("DELETE FROM terminal_sessions WHERE user_id = $1 AND session_id = $2")
-            .bind(user_id)
-            .bind(session_id)
-            .execute(&pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to delete terminal session: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+    // Get password from header
+    let password = headers
+        .get("X-SSH-Password")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    if result.rows_affected() == 0 {
+    // Connect to SSH
+    let ssh_host = std::env::var("SSH_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ssh_port = std::env::var("SSH_PORT")
+        .unwrap_or_else(|_| "22".to_string())
+        .parse::<u16>()
+        .unwrap_or(22);
+
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let mut session = Session::new().map_err(|e| {
+        tracing::error!("Failed to create SSH session: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.set_tcp_stream(tcp);
+    session.handshake().map_err(|e| {
+        tracing::error!("SSH handshake failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
+
+    // Check if session exists
+    let session_exists = crate::terminal::tmux_session_exists_via_ssh(&mut session, &session_id)
+        .map_err(|e| {
+            tracing::error!("Failed to check tmux session: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    if !session_exists {
+        tracing::warn!("Tmux session not found: {}", session_id);
         return Err(StatusCode::NOT_FOUND);
     }
+
+    // Kill tmux session
+    kill_tmux_session_via_ssh(&mut session, &session_id).map_err(|e| {
+        tracing::error!("Failed to kill tmux session: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    tracing::info!("Deleted tmux session: {}", session_id);
 
     Ok(StatusCode::NO_CONTENT)
 }
