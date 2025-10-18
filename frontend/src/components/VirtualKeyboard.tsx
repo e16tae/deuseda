@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 interface VirtualKeyboardProps {
   onKeyPress: (key: string) => void;
   onHeightChange?: (height: number) => void;
-  onCommand?: (command: 'copySelection') => void;
+  onCommand?: (command: 'copySelection' | 'scrollUp' | 'scrollDown' | 'pageUp' | 'pageDown') => void;
 }
 
 type KeyboardLayout = 'letters' | 'korean' | 'symbols' | 'symbolsMore';
@@ -25,7 +25,7 @@ interface ExtraKey {
   value?: string;
   color?: string;
   modifier?: 'ctrl' | 'alt';
-  command?: 'copySelection';
+  command?: 'copySelection' | 'scrollUp' | 'scrollDown' | 'pageUp' | 'pageDown';
   width?: number;
 }
 
@@ -148,6 +148,10 @@ const EXTRA_KEYS: ExtraKey[] = [
   { label: '^D', value: '\x04', color: 'bg-orange-600 hover:bg-orange-500' },
   { label: '^Z', value: '\x1a', color: 'bg-purple-600 hover:bg-purple-500' },
   { label: '^L', value: '\x0c', color: 'bg-blue-600 hover:bg-blue-500' },
+  { label: 'PgUp', command: 'pageUp', color: 'bg-cyan-600 hover:bg-cyan-500' },
+  { label: 'PgDn', command: 'pageDown', color: 'bg-cyan-600 hover:bg-cyan-500' },
+  { label: '⇈', command: 'scrollUp', color: 'bg-indigo-600 hover:bg-indigo-500' },
+  { label: '⇊', command: 'scrollDown', color: 'bg-indigo-600 hover:bg-indigo-500' },
   { label: '←', value: '\x1b[D' },
   { label: '↑', value: '\x1b[A' },
   { label: '↓', value: '\x1b[B' },

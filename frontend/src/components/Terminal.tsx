@@ -290,33 +290,55 @@ export function Terminal({ sessionId }: TerminalProps) {
     }
   };
 
-  const handleKeyboardCommand = async (command: 'copySelection') => {
-    if (command !== 'copySelection') {
+  const handleKeyboardCommand = async (command: 'copySelection' | 'scrollUp' | 'scrollDown' | 'pageUp' | 'pageDown') => {
+    const terminal = xtermRef.current;
+    if (!terminal) {
       return;
     }
 
-    const selection = xtermRef.current?.getSelection?.();
-    if (!selection) {
-      console.warn('No terminal selection to copy');
-      return;
-    }
+    switch (command) {
+      case 'copySelection': {
+        const selection = terminal.getSelection?.();
+        if (!selection) {
+          console.warn('No terminal selection to copy');
+          return;
+        }
 
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(selection);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = selection;
-        textarea.setAttribute('readonly', 'true');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(selection);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = selection;
+            textarea.setAttribute('readonly', 'true');
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          }
+        } catch (error) {
+          console.error('Failed to copy terminal selection', error);
+        }
+        break;
       }
-    } catch (error) {
-      console.error('Failed to copy terminal selection', error);
+
+      case 'scrollUp':
+        terminal.scrollLines(-3);
+        break;
+
+      case 'scrollDown':
+        terminal.scrollLines(3);
+        break;
+
+      case 'pageUp':
+        terminal.scrollPages(-1);
+        break;
+
+      case 'pageDown':
+        terminal.scrollPages(1);
+        break;
     }
   };
 
