@@ -21,7 +21,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
 
     try {
       const response = await apiClient.login(loginData);
-      onLogin(response.token, response.user.username, loginData.password);
+      onLogin(response.token, response.username, loginData.password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

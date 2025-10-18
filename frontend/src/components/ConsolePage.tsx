@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Terminal } from './Terminal';
-import { PlusCircle, LogOut, Eye, Trash2 } from 'lucide-react';
+import { PlusCircle, LogOut, Eye, Trash2, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import type { TerminalSession } from '@/api/client';
 
@@ -23,14 +23,21 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
   const [visibleSessionIds, setVisibleSessionIds] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Load sessions from server on mount
-  useEffect(() => {
-    const loadSessions = async () => {
-      try {
-        const serverSessions = await apiClient.getTerminalSessions();
-        if (serverSessions.length === 0) {
-          // Create default session if none exist
+  // Load sessions from server
+  const loadSessions = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const serverSessions = await apiClient.getTerminalSessions();
+      if (serverSessions.length === 0) {
+        if (!isRefresh) {
+          // Create default session if none exist (only on initial load)
           const defaultSession = await apiClient.createTerminalSession({
             session_id: generateSessionId(),
             title: 'Terminal 1',
@@ -39,22 +46,55 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
           setVisibleSessionIds([defaultSession.id]);
           setActiveSession(defaultSession.id);
         } else {
-          setSessions(serverSessions);
-          setVisibleSessionIds(serverSessions.map((session) => session.id));
-          setActiveSession(serverSessions[0].id);
+          // On refresh, just clear sessions
+          setSessions([]);
+          setVisibleSessionIds([]);
+          setActiveSession('');
         }
-      } catch (error) {
-        console.error('Failed to load sessions:', error);
-        // Fallback to creating a default session
+      } else {
+        const currentVisibleIds = new Set(visibleSessionIds);
+        const newVisibleIds = serverSessions
+          .filter((session) =>
+            // Keep currently visible sessions visible
+            currentVisibleIds.has(session.id) ||
+            // Auto-show new sessions on initial load
+            (!isRefresh && currentVisibleIds.size === 0)
+          )
+          .map((session) => session.id);
+
+        // On initial load, show all sessions
+        const finalVisibleIds = isRefresh
+          ? newVisibleIds.length > 0 ? newVisibleIds : [serverSessions[0].id]
+          : serverSessions.map((session) => session.id);
+
+        setSessions(serverSessions);
+        setVisibleSessionIds(finalVisibleIds);
+
+        // Update active session if needed
+        if (!finalVisibleIds.includes(activeSession) && finalVisibleIds.length > 0) {
+          setActiveSession(finalVisibleIds[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      if (!isRefresh) {
+        // Fallback to creating a default session (only on initial load)
         const fallbackId = generateSessionId();
         setSessions([{ id: fallbackId, title: 'Terminal 1' }]);
         setVisibleSessionIds([fallbackId]);
         setActiveSession(fallbackId);
-      } finally {
+      }
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
         setLoading(false);
       }
-    };
+    }
+  };
 
+  // Load sessions on mount
+  useEffect(() => {
     loadSessions();
   }, []);
 
@@ -219,6 +259,15 @@ export function ConsolePage({ username, onLogout }: ConsolePageProps) {
                 ))}
               </TabsList>
               <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => loadSessions(true)}
+                  disabled={refreshing}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                </Button>
                 <Button size="sm" variant="outline" onClick={addNewSession}>
                   <PlusCircle className="w-4 h-4 mr-1" />
                   New Session

@@ -7,10 +7,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string;
-  user: {
-    id: string;
-    username: string;
-  };
+  username: string;
 }
 
 export interface TerminalSession {
