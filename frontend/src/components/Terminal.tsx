@@ -22,10 +22,6 @@ export function Terminal({ sessionId }: TerminalProps) {
     keyboardHeight: 0,
   });
   const [computedTerminalHeight, setComputedTerminalHeight] = useState<number | undefined>(undefined);
-  const touchStateRef = useRef<{ lastY: number; pending: number; accumulated: number; scrolling: boolean } | null>(null);
-  const lineHeightRef = useRef<number>(18);
-  const TOUCH_SCROLL_THRESHOLD = 12;
-  const detachTouchHandlersRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!isMobile) {
@@ -89,43 +85,29 @@ export function Terminal({ sessionId }: TerminalProps) {
     fitAddonRef.current = fitAddon;
 
     // Disable native keyboard on mobile by preventing focus on xterm's textarea
+    // but allow text selection to work
     let observer: MutationObserver | null = null;
-    const measureLineHeight = () => {
-      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
-      if (rowElement) {
-        const height = rowElement.getBoundingClientRect().height;
-        if (height > 0) {
-          lineHeightRef.current = height;
-        }
-      }
-    };
-
-    measureLineHeight();
     if (isMobile) {
-      // Continuously prevent textarea focus
+      // Prevent native keyboard popup while allowing text selection
       const preventTextareaFocus = () => {
         const textarea = terminalRef.current?.querySelector('textarea');
         if (textarea) {
           textarea.setAttribute('readonly', 'true');
           textarea.setAttribute('inputmode', 'none');
-          textarea.setAttribute('disabled', 'true');
-          textarea.style.pointerEvents = 'none';
+          // Don't disable - let xterm handle selection
           textarea.style.opacity = '0';
           textarea.style.position = 'absolute';
           textarea.style.left = '-9999px';
-          textarea.blur();
 
-          // Prevent focus event
-          const preventFocus = (e: Event) => {
-            e.preventDefault();
-            e.stopPropagation();
-            (e.target as HTMLTextAreaElement).blur();
+          // Prevent keyboard popup but allow selection
+          const preventKeyboard = (e: Event) => {
+            if (e.type === 'focus') {
+              e.preventDefault();
+              (e.target as HTMLTextAreaElement).blur();
+            }
           };
 
-          textarea.addEventListener('focus', preventFocus, true);
-          textarea.addEventListener('touchstart', preventFocus, true);
-          textarea.addEventListener('touchend', preventFocus, true);
-          textarea.addEventListener('click', preventFocus, true);
+          textarea.addEventListener('focus', preventKeyboard, true);
         }
       };
 
@@ -141,48 +123,14 @@ export function Terminal({ sessionId }: TerminalProps) {
       }
     }
 
-    const attachTouchHandlers = () => {
-      if (!isMobile) {
-        detachTouchHandlersRef.current = () => {};
-        return;
-      }
-
-      const viewportElement = terminalRef.current?.querySelector('.xterm-viewport') as HTMLElement | null;
-      if (!viewportElement) {
-        detachTouchHandlersRef.current = () => {};
-        return;
-      }
-
-      const onTouchStart = (event: TouchEvent) => handleTerminalTouchStart(event);
-      const onTouchMove = (event: TouchEvent) => handleTerminalTouchMove(event);
-      const onTouchEnd = () => handleTerminalTouchEnd();
-
-      viewportElement.addEventListener('touchstart', onTouchStart, { passive: false });
-      viewportElement.addEventListener('touchmove', onTouchMove, { passive: false });
-      viewportElement.addEventListener('touchend', onTouchEnd, { passive: false });
-      viewportElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
-
-      detachTouchHandlersRef.current = () => {
-        viewportElement.removeEventListener('touchstart', onTouchStart);
-        viewportElement.removeEventListener('touchmove', onTouchMove);
-        viewportElement.removeEventListener('touchend', onTouchEnd);
-        viewportElement.removeEventListener('touchcancel', onTouchEnd);
-      };
-    };
-
-    attachTouchHandlers();
-
     // Fit after terminal is mounted
     setTimeout(() => {
       try {
         fitAddon.fit();
-        measureLineHeight();
       } catch (e) {
         console.error('Failed to fit terminal:', e);
       }
     }, 0);
-    setTimeout(measureLineHeight, 100);
-    setTimeout(measureLineHeight, 500);
 
     // Connect to WebSocket
     const token = localStorage.getItem('token');
@@ -249,17 +197,11 @@ export function Terminal({ sessionId }: TerminalProps) {
         ws.send(resizeMessage);
         console.log(`Terminal resized: ${cols}x${rows}`);
       }
-      measureLineHeight();
-    });
-
-    const renderDisposable = xterm.onRender(() => {
-      measureLineHeight();
     });
 
     // Handle window resize
     const handleResize = () => {
       fitAddon.fit();
-      measureLineHeight();
     };
     window.addEventListener('resize', handleResize);
 
@@ -275,9 +217,7 @@ export function Terminal({ sessionId }: TerminalProps) {
       if (observer) {
         observer.disconnect();
       }
-      detachTouchHandlersRef.current();
       resizeDisposable.dispose();
-      renderDisposable.dispose();
       window.removeEventListener('resize', handleResize);
       ws.close();
       xterm.dispose();
@@ -390,92 +330,6 @@ export function Terminal({ sessionId }: TerminalProps) {
     return () => cancelAnimationFrame(raf);
   }, [finalTerminalHeight]);
 
-  const handleTerminalTouchStart = (e: TouchEvent) => {
-    if (!isMobile) {
-      return;
-    }
-
-    const target = e.target as HTMLElement | null;
-    if (target?.tagName === 'TEXTAREA' || target?.querySelector('textarea')) {
-      e.preventDefault();
-    }
-
-    if (e.touches.length !== 1) {
-      touchStateRef.current = null;
-      return;
-    }
-
-    const touch = e.touches[0];
-    touchStateRef.current = {
-      lastY: touch.clientY,
-      pending: 0,
-      accumulated: 0,
-      scrolling: false,
-    };
-  };
-
-  const handleTerminalTouchMove = (e: TouchEvent) => {
-    if (!isMobile) {
-      return;
-    }
-    if (e.touches.length !== 1) {
-      touchStateRef.current = null;
-      return;
-    }
-
-    const state = touchStateRef.current;
-    const terminal = xtermRef.current;
-    if (!state || !terminal) {
-      return;
-    }
-
-    const touch = e.touches[0];
-    const deltaY = touch.clientY - state.lastY;
-    state.lastY = touch.clientY;
-
-    if (!state.scrolling) {
-      state.pending += deltaY;
-      if (Math.abs(state.pending) < TOUCH_SCROLL_THRESHOLD) {
-        return;
-      }
-
-      state.scrolling = true;
-      state.pending = 0;
-      state.accumulated = 0;
-
-      const rowElement = terminalRef.current?.querySelector('.xterm-rows > div') as HTMLElement | null;
-      if (rowElement) {
-        const height = rowElement.getBoundingClientRect().height;
-        if (height > 0) {
-          lineHeightRef.current = height;
-        }
-      }
-    }
-
-    state.accumulated += deltaY;
-
-    const lineHeight = lineHeightRef.current || 18;
-    if (lineHeight === 0) {
-      return;
-    }
-
-    const linesToScroll = -Math.trunc(state.accumulated / lineHeight);
-    if (linesToScroll !== 0) {
-      terminal.scrollLines(linesToScroll);
-      state.accumulated += linesToScroll * lineHeight;
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleTerminalTouchEnd = () => {
-    if (!isMobile) {
-      return;
-    }
-    touchStateRef.current = null;
-  };
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       {/* Terminal - takes full height with bottom padding for keypad */}
@@ -486,7 +340,7 @@ export function Terminal({ sessionId }: TerminalProps) {
           paddingBottom: terminalPaddingBottom,
           height: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : '100%',
           maxHeight: finalTerminalHeight !== undefined ? `${finalTerminalHeight}px` : undefined,
-          touchAction: 'auto'
+          touchAction: 'manipulation'
         } : undefined}
       />
 
