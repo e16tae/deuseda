@@ -7,12 +7,10 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - certificate.yaml
-  - postgres-statefulset.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml
   - ingress.yaml
   - apex-redirect.yaml
-  - backup
 
 commonLabels:
   app.kubernetes.io/name: deuseda

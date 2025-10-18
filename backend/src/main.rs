@@ -11,11 +11,9 @@ use tower_http::{
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod auth;
-mod db;
 mod handlers;
 mod middleware;
 mod models;
-mod session;
 mod terminal;
 
 #[tokio::main]
@@ -32,15 +30,10 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Starting deuseda server");
-
-    // Initialize database connection pool
-    let db_pool = db::init_pool().await?;
-    tracing::info!("Database connection pool initialized");
+    tracing::info!("Starting deuseda server (stateless mode - no database)");
 
     // Protected routes (require authentication)
     let protected_routes = Router::new()
-        .route("/api/sessions", get(handlers::session::list_sessions))
         .route(
             "/api/terminal-sessions",
             get(handlers::terminal_session::get_sessions),
@@ -53,8 +46,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/terminal-sessions/:session_id",
             delete(handlers::terminal_session::delete_session),
         )
-        .route_layer(axum_middleware::from_fn_with_state(
-            db_pool.clone(),
+        .route_layer(axum_middleware::from_fn(
             middleware::auth_middleware,
         ));
 
@@ -70,8 +62,7 @@ async fn main() -> anyhow::Result<()> {
                 .allow_methods(Any)
                 .allow_headers(Any),
         )
-        .layer(TraceLayer::new_for_http())
-        .with_state(db_pool);
+        .layer(TraceLayer::new_for_http());
 
     // Get server address from environment
     let _host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());

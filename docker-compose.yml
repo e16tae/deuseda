@@ -1,43 +1,22 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: deuseda-postgres
-    environment:
-      POSTGRES_USER: deuseda
-      POSTGRES_PASSWORD: deuseda_password
-      POSTGRES_DB: deuseda_console
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
-    ports:
-      - "5433:5432"
-    networks:
-      - deuseda-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U deuseda"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: deuseda-backend
     environment:
-      DATABASE_URL: postgres://deuseda:deuseda_password@postgres:5432/deuseda_console
       RUST_LOG: info
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      SSH_HOST: ${SSH_HOST:-host.docker.internal}
+      SSH_PORT: ${SSH_PORT:-22}
     ports:
       - "8080:8080"
     networks:
       - deuseda-network
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -52,9 +31,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  postgres_data:
 
 networks:
   deuseda-network:

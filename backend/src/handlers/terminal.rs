@@ -1,8 +1,8 @@
-use crate::{db::DbPool, middleware::auth::Claims, models::User};
+use crate::middleware::auth::Claims;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Query, State,
+        Query,
     },
     http::StatusCode,
     response::Response,
@@ -14,7 +14,6 @@ use serde_json;
 use ssh2::Session;
 use std::net::TcpStream;
 use tokio::sync::mpsc;
-use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct WsQuery {
@@ -32,7 +31,6 @@ enum TerminalMessage {
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<WsQuery>,
-    State(pool): State<DbPool>,
 ) -> Result<Response, StatusCode> {
     // Validate JWT token from query params
     let token = params.token.ok_or(StatusCode::UNAUTHORIZED)?;
@@ -47,23 +45,17 @@ pub async fn websocket_handler(
     )
     .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let user_id = Uuid::parse_str(&token_data.claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    // Get username from database
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    // Get username directly from JWT
+    let username = token_data.claims.sub;
 
     tracing::info!(
         "WebSocket connection authorized for user: {}",
-        user.username
+        username
     );
 
     let session_id = params.session_id.unwrap_or_else(|| "default".to_string());
 
-    Ok(ws.on_upgrade(move |socket| handle_socket(socket, user.username, session_id)))
+    Ok(ws.on_upgrade(move |socket| handle_socket(socket, username, session_id)))
 }
 
 async fn handle_socket(socket: WebSocket, username: String, session_id: String) {
@@ -167,15 +159,17 @@ async fn handle_socket(socket: WebSocket, username: String, session_id: String) 
             return Err(format!("Failed to request PTY: {}", e));
         }
 
-        // Use screen for persistent sessions (create if not exists, attach if exists)
-        // Each tab gets its own screen session: deuseda-{username}-{session_id}
-        let screen_session_name = format!("deuseda-{}-{}", username_clone, session_id_clone);
-        // -D -R: Detach others and reattach (or create if not exists)
-        let screen_command = format!("screen -D -R {}", screen_session_name);
+        // Use tmux for persistent sessions
+        // Session name is provided by the frontend (session_id)
+        // Try to attach to existing session, or create new one if it doesn't exist
+        let tmux_command = format!(
+            "tmux attach-session -t '{}' || tmux new-session -s '{}'",
+            session_id_clone, session_id_clone
+        );
 
-        if let Err(e) = channel.exec(&screen_command) {
-            tracing::error!("Failed to execute screen command: {}", e);
-            return Err(format!("Failed to execute screen command: {}", e));
+        if let Err(e) = channel.exec(&tmux_command) {
+            tracing::error!("Failed to execute tmux command: {}", e);
+            return Err(format!("Failed to execute tmux command: {}", e));
         }
 
         // Now set to non-blocking mode for I/O
