@@ -9,7 +9,9 @@ use std::net::TcpStream;
 use crate::{
     middleware::auth::Claims,
     models::{CreateTerminalSessionRequest, TerminalSessionResponse},
-    terminal::{create_tmux_session_via_ssh, kill_tmux_session_via_ssh, list_tmux_sessions_via_ssh},
+    terminal::{
+        create_tmux_session_via_ssh, kill_tmux_session_via_ssh, list_tmux_sessions_via_ssh,
+    },
 };
 
 // GET /api/terminal-sessions - Get all terminal sessions for the current user
@@ -34,11 +36,10 @@ pub async fn get_sessions(
         .parse::<u16>()
         .unwrap_or(22);
 
-    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port))
-        .map_err(|e| {
-            tracing::error!("Failed to connect to SSH: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut session = Session::new().map_err(|e| {
         tracing::error!("Failed to create SSH session: {}", e);
@@ -51,19 +52,16 @@ pub async fn get_sessions(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    session
-        .userauth_password(username, password)
-        .map_err(|e| {
-            tracing::error!("SSH authentication failed: {}", e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
 
     // List tmux sessions
-    let tmux_sessions = list_tmux_sessions_via_ssh(&mut session)
-        .map_err(|e| {
-            tracing::error!("Failed to list tmux sessions: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let tmux_sessions = list_tmux_sessions_via_ssh(&mut session).map_err(|e| {
+        tracing::error!("Failed to list tmux sessions: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Convert to response format
     let response: Vec<TerminalSessionResponse> = tmux_sessions
@@ -100,11 +98,10 @@ pub async fn create_session(
         .parse::<u16>()
         .unwrap_or(22);
 
-    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port))
-        .map_err(|e| {
-            tracing::error!("Failed to connect to SSH: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut session = Session::new().map_err(|e| {
         tracing::error!("Failed to create SSH session: {}", e);
@@ -117,27 +114,26 @@ pub async fn create_session(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    session
-        .userauth_password(username, password)
-        .map_err(|e| {
-            tracing::error!("SSH authentication failed: {}", e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
 
     // Check if session already exists, if not create it
-    let session_exists = crate::terminal::tmux_session_exists_via_ssh(&mut session, &req.session_id)
-        .map_err(|e| {
-            tracing::error!("Failed to check tmux session: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let session_exists =
+        crate::terminal::tmux_session_exists_via_ssh(&mut session, &req.session_id).map_err(
+            |e| {
+                tracing::error!("Failed to check tmux session: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            },
+        )?;
 
     if !session_exists {
         // Create new tmux session
-        create_tmux_session_via_ssh(&mut session, &req.session_id)
-            .map_err(|e| {
-                tracing::error!("Failed to create tmux session: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        create_tmux_session_via_ssh(&mut session, &req.session_id).map_err(|e| {
+            tracing::error!("Failed to create tmux session: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
         tracing::info!("Created new tmux session: {}", req.session_id);
     } else {
@@ -173,11 +169,10 @@ pub async fn delete_session(
         .parse::<u16>()
         .unwrap_or(22);
 
-    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port))
-        .map_err(|e| {
-            tracing::error!("Failed to connect to SSH: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let tcp = TcpStream::connect((ssh_host.as_str(), ssh_port)).map_err(|e| {
+        tracing::error!("Failed to connect to SSH: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut session = Session::new().map_err(|e| {
         tracing::error!("Failed to create SSH session: {}", e);
@@ -190,12 +185,10 @@ pub async fn delete_session(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    session
-        .userauth_password(username, password)
-        .map_err(|e| {
-            tracing::error!("SSH authentication failed: {}", e);
-            StatusCode::UNAUTHORIZED
-        })?;
+    session.userauth_password(username, password).map_err(|e| {
+        tracing::error!("SSH authentication failed: {}", e);
+        StatusCode::UNAUTHORIZED
+    })?;
 
     // Check if session exists
     let session_exists = crate::terminal::tmux_session_exists_via_ssh(&mut session, &session_id)
@@ -210,11 +203,10 @@ pub async fn delete_session(
     }
 
     // Kill tmux session
-    kill_tmux_session_via_ssh(&mut session, &session_id)
-        .map_err(|e| {
-            tracing::error!("Failed to kill tmux session: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    kill_tmux_session_via_ssh(&mut session, &session_id).map_err(|e| {
+        tracing::error!("Failed to kill tmux session: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     tracing::info!("Deleted tmux session: {}", session_id);
 

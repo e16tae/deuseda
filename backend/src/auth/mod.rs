@@ -7,7 +7,7 @@ use std::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,  // username
+    pub sub: String, // username
     pub exp: usize,
 }
 
@@ -51,7 +51,7 @@ pub async fn authenticate_user(req: LoginRequest) -> Result<LoginResponse> {
 
     // Generate JWT token with username as subject
     let claims = Claims {
-        sub: req.username.clone(),  // username directly in JWT
+        sub: req.username.clone(), // username directly in JWT
         exp: (chrono::Utc::now() + chrono::Duration::hours(24)).timestamp() as usize,
     };
 

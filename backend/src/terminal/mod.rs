@@ -88,10 +88,7 @@ fn parse_tmux_session_list(output: &str) -> Result<Vec<TmuxSession>> {
 }
 
 /// Create a new tmux session via SSH
-pub fn create_tmux_session_via_ssh(
-    session: &mut Session,
-    session_name: &str,
-) -> Result<()> {
+pub fn create_tmux_session_via_ssh(session: &mut Session, session_name: &str) -> Result<()> {
     let mut channel = session.channel_session()?;
 
     // Create detached tmux session
@@ -104,20 +101,14 @@ pub fn create_tmux_session_via_ssh(
 
     let exit_status = channel.exit_status()?;
     if exit_status != 0 {
-        return Err(anyhow!(
-            "Failed to create tmux session: {}",
-            output
-        ));
+        return Err(anyhow!("Failed to create tmux session: {}", output));
     }
 
     Ok(())
 }
 
 /// Check if a tmux session exists
-pub fn tmux_session_exists_via_ssh(
-    session: &mut Session,
-    session_name: &str,
-) -> Result<bool> {
+pub fn tmux_session_exists_via_ssh(session: &mut Session, session_name: &str) -> Result<bool> {
     let mut channel = session.channel_session()?;
 
     let command = format!("tmux has-session -t '{}' 2>/dev/null", session_name);
@@ -132,10 +123,7 @@ pub fn tmux_session_exists_via_ssh(
 }
 
 /// Kill a tmux session via SSH
-pub fn kill_tmux_session_via_ssh(
-    session: &mut Session,
-    session_name: &str,
-) -> Result<()> {
+pub fn kill_tmux_session_via_ssh(session: &mut Session, session_name: &str) -> Result<()> {
     let mut channel = session.channel_session()?;
 
     let command = format!("tmux kill-session -t '{}'", session_name);
@@ -147,10 +135,7 @@ pub fn kill_tmux_session_via_ssh(
 
     let exit_status = channel.exit_status()?;
     if exit_status != 0 {
-        return Err(anyhow!(
-            "Failed to kill tmux session: {}",
-            output
-        ));
+        return Err(anyhow!("Failed to kill tmux session: {}", output));
     }
 
     Ok(())

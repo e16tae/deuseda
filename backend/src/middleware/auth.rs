@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 /// JWT Claims with username as subject
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    pub sub: String,  // username (not user_id anymore)
+    pub sub: String, // username (not user_id anymore)
     pub exp: usize,
 }
 
@@ -20,10 +20,7 @@ impl Claims {
     }
 }
 
-pub async fn auth_middleware(
-    mut req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
+pub async fn auth_middleware(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     let auth_header = req
         .headers()
         .get(header::AUTHORIZATION)

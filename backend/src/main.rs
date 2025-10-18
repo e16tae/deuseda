@@ -46,9 +46,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/terminal-sessions/:session_id",
             delete(handlers::terminal_session::delete_session),
         )
-        .route_layer(axum_middleware::from_fn(
-            middleware::auth_middleware,
-        ));
+        .route_layer(axum_middleware::from_fn(middleware::auth_middleware));
 
     // Build application routes
     let app = Router::new()

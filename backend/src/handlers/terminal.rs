@@ -48,10 +48,7 @@ pub async fn websocket_handler(
     // Get username directly from JWT
     let username = token_data.claims.sub;
 
-    tracing::info!(
-        "WebSocket connection authorized for user: {}",
-        username
-    );
+    tracing::info!("WebSocket connection authorized for user: {}", username);
 
     let session_id = params.session_id.unwrap_or_else(|| "default".to_string());
 
